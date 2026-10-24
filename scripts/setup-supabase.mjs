@@ -27,19 +27,19 @@ if (SUPER_ADMIN_EMAIL && SUPER_ADMIN_PASSWORD) {
       email: SUPER_ADMIN_EMAIL,
       password: SUPER_ADMIN_PASSWORD,
       email_confirm: true,
-      user_metadata: { full_name: 'System Administrator', company_name: 'Nexora HQ' },
+      user_metadata: { full_name: 'System Administrator', company_name: 'Hich Solutions' },
     });
     if (created.error) throw created.error;
     user = created.data.user;
   }
-  const authUpdated = await admin.auth.admin.updateUserById(user.id, { password: SUPER_ADMIN_PASSWORD, email_confirm: true, user_metadata: { full_name: 'System Administrator', company_name: 'Nexora HQ' } });
+  const authUpdated = await admin.auth.admin.updateUserById(user.id, { password: SUPER_ADMIN_PASSWORD, email_confirm: true, user_metadata: { full_name: 'System Administrator', company_name: 'Hich Solutions' } });
   if (authUpdated.error) throw authUpdated.error;
   const profile = await admin.from('profiles').upsert({ id: user.id, email: SUPER_ADMIN_EMAIL, platform_role: 'super_admin', full_name: 'System Administrator' });
   if (profile.error) throw profile.error;
   let membership = await admin.from('memberships').select('org_id').eq('user_id', user.id).limit(1).maybeSingle();
   if (membership.error) throw membership.error;
   if (!membership.data) {
-    const organization = await admin.from('organizations').insert({ name: 'Nexora HQ', slug: `nexora-hq-${user.id.slice(0, 6)}`, owner_id: user.id, email: SUPER_ADMIN_EMAIL }).select('id').single();
+    const organization = await admin.from('organizations').insert({ name: 'Hich Solutions', slug: `hich-solutions-${user.id.slice(0, 6)}`, owner_id: user.id, email: SUPER_ADMIN_EMAIL }).select('id').single();
     if (organization.error) throw organization.error;
     const membershipCreated = await admin.from('memberships').insert({ org_id: organization.data.id, user_id: user.id, role: 'owner', status: 'active' }).select('org_id').single();
     if (membershipCreated.error) throw membershipCreated.error;
@@ -48,6 +48,8 @@ if (SUPER_ADMIN_EMAIL && SUPER_ADMIN_PASSWORD) {
     membership = membershipCreated;
   }
   const orgId = membership.data.org_id;
+  const renamed = await admin.from('organizations').update({ name: 'Hich Solutions' }).eq('id', orgId);
+  if (renamed.error) throw renamed.error;
   const existing = await admin.from('opportunities').select('id', { count: 'exact', head: true }).eq('org_id', orgId);
   if (existing.error) throw existing.error;
   if (!existing.count) {
