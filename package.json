@@ -1,0 +1,21 @@
+{
+  "name": "nexora-business-suite",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node --check dist/assets/app.js && node --check utils/supabase/client.js",
+    "setup:supabase": "node scripts/setup-supabase.mjs",
+    "verify:supabase": "node scripts/verify-supabase.mjs"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0"
+  },
+  "devDependencies": {
+    "dotenv": "^18.0.9",
+    "esbuild": "^0.28.2",
+    "pg": "^8.23.1"
+  }
+}

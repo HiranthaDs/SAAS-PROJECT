@@ -12,7 +12,53 @@
   <link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-shell" id="authShell">
+    <div class="auth-story">
+      <button class="brand auth-brand" aria-label="Nexora home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>Nexora</span>
+      </button>
+      <div class="auth-message">
+        <span class="auth-kicker">One business. One operating system.</span>
+        <h1>Everything your team needs to run, grow, and adapt.</h1>
+        <p>Connect sales, finance, inventory, people, projects, marketing, and commerce in one secure workspace.</p>
+        <div class="auth-proof">
+          <span><b>50+</b> connected apps</span>
+          <span><b>1</b> source of truth</span>
+          <span><b>24/7</b> cloud access</span>
+        </div>
+      </div>
+      <p class="auth-foot">Built for ambitious teams, from first customer to global scale.</p>
+    </div>
+    <div class="auth-panel">
+      <div class="auth-card" id="authCard">
+        <div class="auth-loading" id="authLoading"><span class="spinner"></span><p>Connecting your workspace…</p></div>
+        <div id="authForms" class="hidden">
+          <span class="eyebrow">Welcome to Nexora</span>
+          <h2 id="authTitle">Sign in to your workspace</h2>
+          <p id="authSubtitle">Enter your details to continue.</p>
+          <div class="auth-tabs"><button class="active" data-auth-tab="signin">Sign in</button><button data-auth-tab="signup">Create account</button></div>
+          <form id="signinForm" class="auth-form">
+            <div class="field"><label>Email address</label><input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></div>
+            <div class="field"><label>Password</label><input type="password" name="password" autocomplete="current-password" placeholder="••••••••" required minlength="8"></div>
+            <div class="auth-form-row"><label class="check-label"><input type="checkbox" checked> Keep me signed in</label><button type="button" class="text-button" id="forgotPassword">Forgot password?</button></div>
+            <button class="btn primary auth-submit" type="submit">Sign in</button>
+          </form>
+          <form id="signupForm" class="auth-form hidden">
+            <div class="field-grid"><div class="field"><label>Your name</label><input name="full_name" autocomplete="name" placeholder="Alex Morgan" required></div><div class="field"><label>Company</label><input name="company_name" autocomplete="organization" placeholder="Acme Studio" required></div></div>
+            <div class="field"><label>Work email</label><input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></div>
+            <div class="field"><label>Password</label><input type="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8"></div>
+            <label class="check-label"><input type="checkbox" required> I agree to the Terms and Privacy Policy</label>
+            <button class="btn primary auth-submit" type="submit">Create my workspace</button>
+          </form>
+          <div class="auth-error hidden" id="authError"></div>
+          <p class="auth-security">Protected by encrypted sessions and tenant-level data isolation.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="app-shell hidden" id="appShell">
     <aside class="sidebar" id="sidebar">
       <div class="brand-row">
         <button class="brand" data-route="overview" aria-label="Nexora home">
@@ -84,6 +130,6 @@
     </section>
   </template>
 
-  <script src="assets/app.js"></script>
+  <script type="module" src="assets/app.bundle.js"></script>
 </body>
 </html>

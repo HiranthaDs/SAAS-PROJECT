@@ -1,3 +1,5 @@
+import { supabase } from '../../utils/supabase/client.js';
+
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 
@@ -72,12 +74,17 @@ const defaults={
 
 let state=JSON.parse(localStorage.getItem('nexora-state')||'null')||structuredClone(defaults);
 let currentRoute='overview';
+let session=null;
+let userProfile=null;
+let currentOrg=null;
+let currentMembership=null;
+let orgSettings=null;
 const page=$('#page');
 const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
 const persist=()=>localStorage.setItem('nexora-state',JSON.stringify(state));
 
 function header(title,description,primary='Create',extra='Export'){
-  return `<div class="page-head"><div><span class="eyebrow">Atlas Studio · ${new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><h1>${title}</h1><p>${description}</p></div><div class="head-actions"><button class="btn" data-export data-icon="download">${extra}</button><button class="btn primary" data-create data-icon="plus">${primary}</button></div></div>`;
+  return `<div class="page-head"><div><span class="eyebrow">${currentOrg?.name||'Your workspace'} · ${new Date().toLocaleDateString('en-US',{month:'long',year:'numeric'})}</span><h1>${title}</h1><p>${description}</p></div><div class="head-actions"><button class="btn" data-export data-icon="download">${extra}</button><button class="btn primary" data-create data-icon="plus">${primary}</button></div></div>`;
 }
 function statusClass(s){return /paid|online|track|done|active|sent|completed/i.test(s)?'green':/overdue|risk|blocked|low/i.test(s)?'red':/pending|review|away|draft|progress/i.test(s)?'orange':''}
 
@@ -143,17 +150,17 @@ function productivity(){
 const appGroups={Website:['Website','eCommerce','Blog','Forum','eLearning','Live Chat'],Sales:['CRM','Sales','Point of Sale','Subscriptions','Rental'],Finance:['Accounting','Invoicing','Expenses','Documents','Spreadsheets','Sign','ESG'],Operations:['Inventory','Manufacturing','PLM','Purchase','Maintenance','Quality'],People:['Employees','Recruitment','Time Off','Appraisals','Payroll','Referrals','Fleet'],Marketing:['Automation','Email Marketing','SMS Marketing','Social Marketing','Events','Surveys'],Services:['Projects','Timesheets','Field Service','Helpdesk','Planning','Appointments'],Productivity:['Discuss','Approvals','Calendar','Knowledge','AI Assistant','VoIP','IoT']};
 function apps(){return `${header('Apps & Studio','Activate capabilities as your business grows. Every app shares the same data.','Build custom app')}${toolbar('Search 50+ connected apps...')}<div id="appsDirectory">${Object.entries(appGroups).map(([g,items])=>`<h2 class="category-title">${g}</h2><div class="apps-grid">${items.map((a,i)=>`<button class="app-card" data-search="${g} ${a}" data-app="${a}"><span class="app-icon">${a.slice(0,1)}</span><span><strong>${a}</strong><small>${i%3===0?'Configured':'Ready to install'}</small></span></button>`).join('')}</div>`).join('')}</div>`}
 
-function settings(){return `${header('Settings','Configure your company, users, automation, security, and connected services.','Save changes','Audit log')}<div class="settings-layout"><aside class="settings-nav"><button class="active">Company profile</button><button>Users & access</button><button>Billing & plans</button><button>Localization</button><button>Automation</button><button>Integrations</button><button>Security</button></aside><section class="form-section"><h2>Company profile</h2><p>This information appears across invoices, documents, and customer communications.</p><div class="field-grid"><div class="field"><label>Company name</label><input value="Atlas Studio (Pvt) Ltd"></div><div class="field"><label>Industry</label><select><option>Professional services</option><option>Retail</option><option>Manufacturing</option></select></div><div class="field"><label>Business email</label><input value="hello@atlas.studio"></div><div class="field"><label>Phone</label><input value="+94 11 234 5678"></div><div class="field full"><label>Address</label><textarea rows="3">42 Galle Road, Colombo 03, Sri Lanka</textarea></div><div class="field"><label>Currency</label><select><option>USD — US Dollar</option><option>LKR — Sri Lankan Rupee</option></select></div><div class="field"><label>Timezone</label><select><option>Asia/Colombo (GMT+05:30)</option></select></div></div><h2 style="margin-top:28px">Workspace preferences</h2><div class="toggle-row"><span><strong>Smart notifications</strong><small>Prioritize alerts based on your role and activity.</small></span><button class="toggle on"><i></i></button></div><div class="toggle-row"><span><strong>AI recommendations</strong><small>Show proactive suggestions across workflows.</small></span><button class="toggle on"><i></i></button></div><div class="toggle-row"><span><strong>Weekly executive digest</strong><small>Email leadership metrics every Monday.</small></span><button class="toggle"><i></i></button></div></section></div>`}
+function settings(){return `${header('Settings','Configure your company, users, automation, security, and connected services.','Save changes','Audit log')}<div class="settings-layout"><aside class="settings-nav"><button class="active">Company profile</button><button>Users & access</button><button>Billing & plans</button><button>Localization</button><button>Automation</button><button>Integrations</button><button>Security</button></aside><section class="form-section"><h2>Company profile</h2><p>This information appears across invoices, documents, and customer communications.</p><div class="field-grid"><div class="field"><label>Company name</label><input data-org-field="name" value="${currentOrg?.name||''}"></div><div class="field"><label>Industry</label><select data-org-field="industry"><option ${currentOrg?.industry==='Professional services'?'selected':''}>Professional services</option><option ${currentOrg?.industry==='Retail'?'selected':''}>Retail</option><option ${currentOrg?.industry==='Manufacturing'?'selected':''}>Manufacturing</option></select></div><div class="field"><label>Business email</label><input data-org-field="email" value="${currentOrg?.email||session?.user?.email||''}"></div><div class="field"><label>Phone</label><input data-org-field="phone" value="${currentOrg?.phone||''}"></div><div class="field full"><label>Address</label><textarea data-org-field="address" rows="3">${currentOrg?.address||''}</textarea></div><div class="field"><label>Currency</label><select data-setting-field="currency"><option value="USD" ${orgSettings?.currency==='USD'?'selected':''}>USD — US Dollar</option><option value="LKR" ${orgSettings?.currency==='LKR'?'selected':''}>LKR — Sri Lankan Rupee</option></select></div><div class="field"><label>Timezone</label><select data-setting-field="timezone"><option value="Asia/Colombo" selected>Asia/Colombo (GMT+05:30)</option></select></div></div><h2 style="margin-top:28px">Workspace preferences</h2><div class="toggle-row"><span><strong>Smart notifications</strong><small>Prioritize alerts based on your role and activity.</small></span><button class="toggle on"><i></i></button></div><div class="toggle-row"><span><strong>AI recommendations</strong><small>Show proactive suggestions across workflows.</small></span><button class="toggle on"><i></i></button></div><div class="toggle-row"><span><strong>Weekly executive digest</strong><small>Email leadership metrics every Monday.</small></span><button class="toggle"><i></i></button></div></section></div>`}
 
 const renderers={overview,sales,finance,inventory,manufacturing,people,services,marketing,commerce,productivity,apps,settings};
 function render(route=currentRoute){currentRoute=route;page.innerHTML=renderers[route]();$$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.route===route));hydrateIcons(page);bindPage();window.scrollTo({top:0,behavior:'smooth'});location.hash=route==='overview'?'':route;}
 
 function bindPage(){
-  $$('[data-create]',page).forEach(b=>b.onclick=()=>openCreate());
+  $$('[data-create]',page).forEach(b=>b.onclick=()=>currentRoute==='settings'?saveOrgSettings():openCreate());
   $$('[data-export]',page).forEach(b=>b.onclick=()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='nexora-business-report.json';a.click();toast('Report exported successfully')});
   $$('[data-route-link]',page).forEach(b=>b.onclick=()=>render(b.dataset.routeLink));
   const filter=$('[data-filter-input]',page);if(filter)filter.oninput=()=>$$('[data-search]',page).forEach(el=>el.classList.toggle('hidden',!el.dataset.search.toLowerCase().includes(filter.value.toLowerCase())));
-  $$('[data-pay]',page).forEach(b=>b.onclick=()=>{const inv=state.invoices.find(i=>i.id===b.dataset.pay);if(inv&&inv.status!=='Paid'){inv.status='Paid';persist();render();toast(`${inv.id} marked as paid`)}else toast('Invoice opened')});
+  $$('[data-pay]',page).forEach(b=>b.onclick=async()=>{const inv=state.invoices.find(i=>i.id===b.dataset.pay);if(inv&&inv.status!=='Paid'){const {error}=await supabase.from('invoices').update({status:'Paid'}).eq('id',inv.dbId||inv.id);if(error)return toast(error.message);inv.status='Paid';persist();render();toast(`${inv.id} marked as paid`)}else toast('Invoice opened')});
   $$('[data-reorder]',page).forEach(b=>b.onclick=()=>{b.textContent='Ordered';b.disabled=true;toast(`Purchase order created for ${b.dataset.reorder}`)});
   $$('[data-timer]',page).forEach(b=>b.onclick=()=>{b.textContent=b.textContent==='Start timer'?'00:00:01 · Stop':'Start timer';toast(b.textContent.includes('Stop')?'Timesheet timer started':'Time entry saved')});
   $$('[data-approve]',page).forEach(b=>b.onclick=()=>{b.closest('tr').style.opacity='.45';b.textContent='Approved';b.disabled=true;toast('Request approved')});
@@ -165,7 +172,7 @@ function bindPage(){
 function bindKanban(){
  let dragged=null;
  $$('.deal-card').forEach(card=>{card.ondragstart=()=>{dragged=card;card.classList.add('dragging')};card.ondragend=()=>card.classList.remove('dragging')});
- $$('.kanban-col').forEach(col=>{col.ondragover=e=>e.preventDefault();col.ondrop=()=>{if(!dragged)return;col.appendChild(dragged);const deal=state.deals.find(d=>d.id==dragged.dataset.id);deal.stage=col.dataset.stage;persist();toast(`Opportunity moved to ${deal.stage}`);render('sales')}})
+ $$('.kanban-col').forEach(col=>{col.ondragover=e=>e.preventDefault();col.ondrop=async()=>{if(!dragged)return;col.appendChild(dragged);const deal=state.deals.find(d=>d.id==dragged.dataset.id);deal.stage=col.dataset.stage;const {error}=await supabase.from('opportunities').update({stage:deal.stage}).eq('id',deal.id);if(error)return toast(error.message);persist();toast(`Opportunity moved to ${deal.stage}`);render('sales')}})
 }
 
 function openCreate(){
@@ -182,9 +189,22 @@ function openCreate(){
   apps:{title:'Build custom app',fields:[['App name','name'],['Purpose','purpose','textarea']]},
   settings:{title:'Save settings',fields:[]},overview:{title:'Quick create',fields:[['Record type','type'],['Title','title'],['Details','details','textarea']]}
  };
- const c=configs[currentRoute]||configs.overview;const layer=$('#modalLayer');const tpl=$('#modalTemplate').content.cloneNode(true);layer.innerHTML='';layer.append(tpl);$('#modalTitle',layer).textContent=c.title;$('#modalBody',layer).innerHTML=`<form id="createForm"><div class="field-grid">${c.fields.map(f=>`<div class="field ${f[2]==='textarea'?'full':''}"><label>${f[0]}</label>${f[2]==='textarea'?`<textarea name="${f[1]}" rows="4" required></textarea>`:`<input name="${f[1]}" type="${f[2]||'text'}" required>`}</div>`).join('')}</div><div class="modal-actions"><button type="button" class="btn" data-close-modal>Cancel</button><button class="btn primary" type="submit">Save record</button></div></form>`;hydrateIcons(layer);layer.classList.add('open');layer.setAttribute('aria-hidden','false');$$('[data-close-modal]',layer).forEach(x=>x.onclick=closeModal);const form=$('#createForm',layer);if(form)form.onsubmit=e=>{e.preventDefault();saveRecord(new FormData(form));closeModal()};setTimeout(()=>$('.field input,.field textarea',layer)?.focus(),50);
+ const c=configs[currentRoute]||configs.overview;const layer=$('#modalLayer');const tpl=$('#modalTemplate').content.cloneNode(true);layer.innerHTML='';layer.append(tpl);$('#modalTitle',layer).textContent=c.title;$('#modalBody',layer).innerHTML=`<form id="createForm"><div class="field-grid">${c.fields.map(f=>`<div class="field ${f[2]==='textarea'?'full':''}"><label>${f[0]}</label>${f[2]==='textarea'?`<textarea name="${f[1]}" rows="4" required></textarea>`:`<input name="${f[1]}" type="${f[2]||'text'}" required>`}</div>`).join('')}</div><div class="modal-actions"><button type="button" class="btn" data-close-modal>Cancel</button><button class="btn primary" type="submit">Save record</button></div></form>`;hydrateIcons(layer);layer.classList.add('open');layer.setAttribute('aria-hidden','false');$$('[data-close-modal]',layer).forEach(x=>x.onclick=closeModal);const form=$('#createForm',layer);if(form)form.onsubmit=async e=>{e.preventDefault();const submit=$('[type="submit"]',form);submit.disabled=true;submit.textContent='Saving…';const saved=await saveRecord(new FormData(form));if(saved)closeModal();else{submit.disabled=false;submit.textContent='Save record'}};setTimeout(()=>$('.field input,.field textarea',layer)?.focus(),50);
 }
-function saveRecord(fd){const o=Object.fromEntries(fd.entries());if(currentRoute==='sales'){state.deals.push({id:Date.now(),stage:'New',company:o.company,title:o.title,value:+o.value,owner:'HD',prob:+o.prob})}else if(currentRoute==='finance'){state.invoices.unshift({id:`INV-2026-${480+state.invoices.length}`,customer:o.customer,date:new Date(o.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),amount:+o.amount,status:'Pending'})}else if(currentRoute==='people'){state.employees.push({...o,initials:o.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase(),status:'Online'})}else if(currentRoute==='services'){state.tasks.push({...o,progress:0,status:'On track'})}persist();render();toast(`${o.title||o.name||o.company||'Record'} created successfully`)}
+async function saveRecord(fd){
+ const o=Object.fromEntries(fd.entries());let result={data:null,error:null};
+ if(!currentOrg?.id){toast('No active workspace');return false}
+ if(currentRoute==='sales')result=await supabase.from('opportunities').insert({org_id:currentOrg.id,company:o.company,title:o.title,value:+o.value,probability:+o.prob,stage:'New',owner_id:session.user.id}).select().single();
+ else if(currentRoute==='finance')result=await supabase.from('invoices').insert({org_id:currentOrg.id,number:`INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,customer:o.customer,issue_date:o.date,subtotal:+o.amount,status:'Pending',created_by:session.user.id}).select().single();
+ else if(currentRoute==='people')result=await supabase.from('employees').insert({org_id:currentOrg.id,name:o.name,role_title:o.role,department:o.dept,email:null}).select().single();
+ else if(currentRoute==='services')result=await supabase.from('projects').insert({org_id:currentOrg.id,name:o.name,client:o.client,due_date:o.due,progress:0,status:'On track',manager_id:session.user.id}).select().single();
+ else if(currentRoute==='marketing')result=await supabase.from('campaigns').insert({org_id:currentOrg.id,name:o.name,channel:o.channel,audience_size:+o.audience,created_by:session.user.id}).select().single();
+ else if(currentRoute==='commerce')result=await supabase.from('website_pages').insert({org_id:currentOrg.id,title:o.title,slug:o.slug,page_type:o.type}).select().single();
+ else if(currentRoute==='productivity')result=await supabase.from('knowledge_articles').insert({org_id:currentOrg.id,title:o.title,content:o.content,created_by:session.user.id}).select().single();
+ else {toast('This workflow is ready for configuration');return true}
+ if(result.error){toast(result.error.message);return false}
+ await loadWorkspaceData();render();toast(`${o.title||o.name||o.company||'Record'} created successfully`);return true;
+}
 function closeModal(){const l=$('#modalLayer');l.classList.remove('open');l.setAttribute('aria-hidden','true')}
 
 function openSearch(){
@@ -194,9 +214,84 @@ function openSearch(){
 function toast(message){const el=document.createElement('div');el.className='toast';el.innerHTML=`<b>✓</b><span>${message}</span>`;$('#toastStack').append(el);setTimeout(()=>el.remove(),3000)}
 function notificationPanel(){let p=$('.notification-panel');if(!p){p=document.createElement('div');p.className='notification-panel';p.innerHTML='<h3>Notifications</h3><div class="notice"><i></i><div><p><b>Inventory alert:</b> 2 products reached their reorder point.</p><small>12 minutes ago</small></div></div><div class="notice"><i></i><div><p><b>Payment received:</b> $12,840 from Northstar Labs.</p><small>36 minutes ago</small></div></div><div class="notice"><i></i><div><p><b>Leave request:</b> Maya requested 3 days off.</p><small>1 hour ago</small></div></div>';document.body.append(p)}p.classList.toggle('open')}
 
+async function loadWorkspaceData(){
+  const profileResult=await supabase.from('profiles').select('*').eq('id',session.user.id).single();
+  if(profileResult.error)throw profileResult.error;
+  userProfile=profileResult.data;
+  const membershipResult=await supabase.from('memberships').select('org_id,role,status,organizations(*)').eq('user_id',session.user.id).eq('status','active').limit(1).single();
+  if(membershipResult.error)throw membershipResult.error;
+  currentMembership=membershipResult.data;
+  currentOrg=membershipResult.data.organizations;
+  const [settingsResult,dealsResult,invoicesResult,productsResult,employeesResult,projectsResult]=await Promise.all([
+    supabase.from('organization_settings').select('*').eq('org_id',currentOrg.id).single(),
+    supabase.from('opportunities').select('*').eq('org_id',currentOrg.id).order('created_at',{ascending:false}),
+    supabase.from('invoices').select('*').eq('org_id',currentOrg.id).order('created_at',{ascending:false}),
+    supabase.from('products').select('*').eq('org_id',currentOrg.id).eq('active',true).order('name'),
+    supabase.from('employees').select('*').eq('org_id',currentOrg.id).order('name'),
+    supabase.from('projects').select('*').eq('org_id',currentOrg.id).order('created_at',{ascending:false})
+  ]);
+  const failed=[settingsResult,dealsResult,invoicesResult,productsResult,employeesResult,projectsResult].find(x=>x.error);
+  if(failed)throw failed.error;
+  orgSettings=settingsResult.data;
+  const initials=(userProfile.full_name||session.user.email).split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  state.deals=dealsResult.data.map(d=>({id:d.id,stage:d.stage,company:d.company,title:d.title,value:Number(d.value),owner:initials,prob:d.probability}));
+  state.invoices=invoicesResult.data.map(i=>({id:i.number,dbId:i.id,customer:i.customer,date:new Date(i.issue_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),amount:Number(i.total),status:i.status}));
+  state.products=productsResult.data.map(p=>({id:p.id,sku:p.sku,name:p.name,category:p.category||'General',stock:Number(p.stock),forecast:Number(p.forecast),price:Number(p.price)}));
+  state.employees=employeesResult.data.map(e=>({id:e.id,name:e.name,role:e.role_title||'Team member',dept:e.department||'General',initials:e.name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase(),status:e.employment_status==='active'?'Online':'Offline'}));
+  state.tasks=projectsResult.data.map(p=>({id:p.id,name:p.name,client:p.client||'Internal',due:p.due_date?new Date(p.due_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}):'Not set',progress:p.progress,status:p.status}));
+  persist();updateChrome();
+}
+
+function updateChrome(){
+  const workspaceName=currentOrg?.name||'Your workspace';
+  $('.workspace-switcher strong').textContent=workspaceName;
+  $('.workspace-switcher small').textContent=`${currentMembership?.role||'member'} workspace`;
+  const name=userProfile?.full_name||session?.user?.email?.split('@')[0]||'User';
+  $('.user-copy strong').textContent=name;
+  $('.user-copy small').textContent=userProfile?.platform_role==='super_admin'?'Super administrator':(currentMembership?.role||'Member');
+  $('.user-avatar').textContent=name.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  $('.workspace-avatar').textContent=workspaceName.split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  if(!$('.sync-pill')){const sync=document.createElement('div');sync.className='sync-pill';sync.textContent='Synced with Supabase';document.body.append(sync)}
+}
+
+async function saveOrgSettings(){
+  const orgPatch={};$$('[data-org-field]',page).forEach(el=>orgPatch[el.dataset.orgField]=el.value.trim());
+  const settingsPatch={};$$('[data-setting-field]',page).forEach(el=>settingsPatch[el.dataset.settingField]=el.value);
+  const [orgResult,settingsResult]=await Promise.all([
+    supabase.from('organizations').update(orgPatch).eq('id',currentOrg.id).select().single(),
+    supabase.from('organization_settings').update(settingsPatch).eq('org_id',currentOrg.id).select().single()
+  ]);
+  if(orgResult.error||settingsResult.error)return toast((orgResult.error||settingsResult.error).message);
+  currentOrg=orgResult.data;orgSettings=settingsResult.data;updateChrome();render('settings');toast('Workspace settings saved');
+}
+
+function showAuth(){
+  $('#appShell').classList.add('hidden');$('#authShell').classList.remove('hidden');$('#authLoading').classList.add('hidden');$('#authForms').classList.remove('hidden');$('.sync-pill')?.remove();
+}
+function showAuthError(message){const box=$('#authError');box.textContent=message;box.classList.toggle('hidden',!message)}
+async function bootstrapApp(activeSession){
+  session=activeSession;$('#authLoading').classList.remove('hidden');$('#authForms').classList.add('hidden');
+  try{await loadWorkspaceData();$('#authShell').classList.add('hidden');$('#appShell').classList.remove('hidden');hydrateIcons();const initial=location.hash.slice(1);render(renderers[initial]?initial:'overview')}
+  catch(error){showAuth();showAuthError(error.message||'Unable to load your workspace.')}
+}
+async function initAuth(){
+  const {data,error}=await supabase.auth.getSession();
+  if(error){showAuth();showAuthError(error.message);return}
+  if(data.session)await bootstrapApp(data.session);else showAuth();
+  supabase.auth.onAuthStateChange((event,nextSession)=>{if(event==='SIGNED_OUT'){session=null;showAuth()}else if(event==='SIGNED_IN'&&nextSession&&!session)bootstrapApp(nextSession)});
+}
+function openProfile(){
+  const layer=$('#modalLayer');layer.innerHTML=`<div class="modal-backdrop" data-close-modal></div><section class="modal search-modal"><div class="modal-body"><span class="eyebrow">Account</span><h2 style="font:800 1.3rem Manrope;margin:7px 0">${userProfile?.full_name||'Your profile'}</h2><p style="font-size:.72rem;color:var(--muted)">${session?.user?.email||''}</p><div class="alert-row" style="margin:20px 0"><span class="record-icon">${currentMembership?.role?.slice(0,1).toUpperCase()||'M'}</span><div><strong>${currentOrg?.name||'Workspace'}</strong><small>${currentMembership?.role||'member'} · ${userProfile?.platform_role==='super_admin'?'Platform super admin':'Workspace user'}</small></div></div><div class="modal-actions"><button class="btn" data-close-modal>Close</button><button class="btn primary" id="signOutButton">Sign out</button></div></div></section>`;layer.classList.add('open');layer.setAttribute('aria-hidden','false');$$('[data-close-modal]',layer).forEach(x=>x.onclick=closeModal);$('#signOutButton').onclick=async()=>{await supabase.auth.signOut();closeModal()};
+}
+
+$$('[data-auth-tab]').forEach(button=>button.onclick=()=>{const signup=button.dataset.authTab==='signup';$$('[data-auth-tab]').forEach(x=>x.classList.toggle('active',x===button));$('#signinForm').classList.toggle('hidden',signup);$('#signupForm').classList.toggle('hidden',!signup);$('#authTitle').textContent=signup?'Create your business workspace':'Sign in to your workspace';$('#authSubtitle').textContent=signup?'Start with every app ready to configure.':'Enter your details to continue.';showAuthError('')});
+$('#signinForm').onsubmit=async event=>{event.preventDefault();showAuthError('');const button=$('[type="submit"]',event.currentTarget);button.disabled=true;button.textContent='Signing in…';const values=Object.fromEntries(new FormData(event.currentTarget));const {data,error}=await supabase.auth.signInWithPassword({email:values.email,password:values.password});button.disabled=false;button.textContent='Sign in';if(error)return showAuthError(error.message);await bootstrapApp(data.session)};
+$('#signupForm').onsubmit=async event=>{event.preventDefault();showAuthError('');const button=$('[type="submit"]',event.currentTarget);button.disabled=true;button.textContent='Creating workspace…';const values=Object.fromEntries(new FormData(event.currentTarget));const {data,error}=await supabase.auth.signUp({email:values.email,password:values.password,options:{data:{full_name:values.full_name,company_name:values.company_name}}});button.disabled=false;button.textContent='Create my workspace';if(error)return showAuthError(error.message);if(data.session)await bootstrapApp(data.session);else{showAuthError('Check your email to confirm your account, then sign in.');event.currentTarget.reset()}};
+$('#forgotPassword').onclick=async()=>{const email=$('#signinForm [name="email"]').value;if(!email)return showAuthError('Enter your email address first.');const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin});showAuthError(error?error.message:'Password reset instructions have been sent.')};
+
 $$('[data-route]').forEach(b=>b.onclick=()=>{render(b.dataset.route);$('#sidebar').classList.remove('open');$('#navScrim').classList.remove('open')});
 $('#openNav').onclick=()=>{$('#sidebar').classList.add('open');$('#navScrim').classList.add('open')};$('#closeNav').onclick=$('#navScrim').onclick=()=>{$('#sidebar').classList.remove('open');$('#navScrim').classList.remove('open')};
-$('#searchTrigger').onclick=openSearch;$('#notificationButton').onclick=notificationPanel;$('#quickChat').onclick=()=>render('productivity');$('#userMenu').onclick=()=>toast('Profile menu opened');$('#workspaceButton').onclick=()=>toast('Atlas Studio is your active workspace');$('#helpButton').onclick=()=>toast('Help center is ready');
+$('#searchTrigger').onclick=openSearch;$('#notificationButton').onclick=notificationPanel;$('#quickChat').onclick=()=>render('productivity');$('#userMenu').onclick=openProfile;$('#workspaceButton').onclick=()=>toast(`${currentOrg?.name||'Workspace'} is active`);$('#helpButton').onclick=()=>toast('Help center is ready');
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch()}if(e.key==='Escape')closeModal()});
 hydrateIcons();
-const initial=location.hash.slice(1);render(renderers[initial]?initial:'overview');
+initAuth();
