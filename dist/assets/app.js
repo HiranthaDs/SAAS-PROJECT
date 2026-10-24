@@ -292,16 +292,26 @@ async function saveOrgSettings(){
 function showAuth(){
   $('#appShell').classList.add('hidden');$('#authShell').classList.remove('hidden');$('#authLoading').classList.add('hidden');$('#authForms').classList.remove('hidden');$('.sync-pill')?.remove();
 }
-function showAuthError(message){const box=$('#authError');box.textContent=message;box.classList.toggle('hidden',!message)}
+function showAuthError(message,{resend=false,info=false}={}){const box=$('#authError');box.textContent=message;box.classList.toggle('hidden',!message);box.classList.toggle('info',info);$('#resendConfirmation').classList.toggle('hidden',!resend)}
+function authRedirectUrl(){return `${location.origin}/`}
+function readAuthCallbackError(){
+  const params=new URLSearchParams(location.hash.replace(/^#/,''));
+  const code=params.get('error_code');
+  if(!code)return null;
+  const description=(params.get('error_description')||'Authentication failed.').replace(/\+/g,' ');
+  history.replaceState(null,'',location.pathname+location.search);
+  return {code,description};
+}
 async function bootstrapApp(activeSession){
   session=activeSession;$('#authLoading').classList.remove('hidden');$('#authForms').classList.add('hidden');
   try{await loadWorkspaceData();$('#authShell').classList.add('hidden');$('#appShell').classList.remove('hidden');hydrateIcons();const initial=location.hash.slice(1);render(renderers[initial]?initial:'home')}
   catch(error){showAuth();showAuthError(error.message||'Unable to load your workspace.')}
 }
 async function initAuth(){
+  const callbackError=readAuthCallbackError();
   const {data,error}=await supabase.auth.getSession();
   if(error){showAuth();showAuthError(error.message);return}
-  if(data.session)await bootstrapApp(data.session);else showAuth();
+  if(data.session)await bootstrapApp(data.session);else{showAuth();if(callbackError)showAuthError(callbackError.code==='otp_expired'?'This confirmation link has expired. Enter your email and request a fresh link.':callbackError.description,{resend:callbackError.code==='otp_expired'})}
   supabase.auth.onAuthStateChange((event,nextSession)=>{if(event==='SIGNED_OUT'){session=null;showAuth()}else if(event==='SIGNED_IN'&&nextSession&&!session)bootstrapApp(nextSession)});
 }
 function openProfile(){
@@ -310,8 +320,9 @@ function openProfile(){
 
 $$('[data-auth-tab]').forEach(button=>button.onclick=()=>{const signup=button.dataset.authTab==='signup';$$('[data-auth-tab]').forEach(x=>x.classList.toggle('active',x===button));$('#signinForm').classList.toggle('hidden',signup);$('#signupForm').classList.toggle('hidden',!signup);$('#authTitle').textContent=signup?'Create your business workspace':'Sign in to your workspace';$('#authSubtitle').textContent=signup?'Start with every app ready to configure.':'Enter your details to continue.';showAuthError('')});
 $('#signinForm').onsubmit=async event=>{event.preventDefault();showAuthError('');const button=$('[type="submit"]',event.currentTarget);button.disabled=true;button.textContent='Signing in…';const values=Object.fromEntries(new FormData(event.currentTarget));const {data,error}=await supabase.auth.signInWithPassword({email:values.email,password:values.password});button.disabled=false;button.textContent='Sign in';if(error)return showAuthError(error.message);await bootstrapApp(data.session)};
-$('#signupForm').onsubmit=async event=>{event.preventDefault();showAuthError('');const button=$('[type="submit"]',event.currentTarget);button.disabled=true;button.textContent='Creating workspace…';const values=Object.fromEntries(new FormData(event.currentTarget));const {data,error}=await supabase.auth.signUp({email:values.email,password:values.password,options:{data:{full_name:values.full_name,company_name:values.company_name}}});button.disabled=false;button.textContent='Create my workspace';if(error)return showAuthError(error.message);if(data.session)await bootstrapApp(data.session);else{showAuthError('Check your email to confirm your account, then sign in.');event.currentTarget.reset()}};
-$('#forgotPassword').onclick=async()=>{const email=$('#signinForm [name="email"]').value;if(!email)return showAuthError('Enter your email address first.');const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:location.origin});showAuthError(error?error.message:'Password reset instructions have been sent.')};
+$('#signupForm').onsubmit=async event=>{event.preventDefault();showAuthError('');const button=$('[type="submit"]',event.currentTarget);button.disabled=true;button.textContent='Creating workspace…';const values=Object.fromEntries(new FormData(event.currentTarget));const {data,error}=await supabase.auth.signUp({email:values.email,password:values.password,options:{emailRedirectTo:authRedirectUrl(),data:{full_name:values.full_name,company_name:values.company_name}}});button.disabled=false;button.textContent='Create my workspace';if(error)return showAuthError(error.message);if(data.session)await bootstrapApp(data.session);else{showAuthError('Check your email to confirm your account. The link will return you to this address.',{resend:true,info:true});$('#signinForm [name="email"]').value=values.email}};
+$('#resendConfirmation').onclick=async()=>{const email=$('#signinForm [name="email"]').value||$('#signupForm [name="email"]').value;if(!email)return showAuthError('Enter your email address first.',{resend:true});const button=$('#resendConfirmation');button.disabled=true;button.textContent='Sending…';const {error}=await supabase.auth.resend({type:'signup',email,options:{emailRedirectTo:authRedirectUrl()}});button.disabled=false;button.textContent='Resend confirmation email';showAuthError(error?error.message:'A fresh confirmation email has been sent.',{resend:!!error,info:!error})};
+$('#forgotPassword').onclick=async()=>{const email=$('#signinForm [name="email"]').value;if(!email)return showAuthError('Enter your email address first.');const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl()});showAuthError(error?error.message:'Password reset instructions have been sent.',{info:!error})};
 
 $$('[data-route]').forEach(b=>b.onclick=()=>{render(b.dataset.route);$('#sidebar').classList.remove('open');$('#navScrim').classList.remove('open')});
 $('#openNav').onclick=()=>{$('#sidebar').classList.add('open');$('#navScrim').classList.add('open')};$('#closeNav').onclick=$('#navScrim').onclick=()=>{$('#sidebar').classList.remove('open');$('#navScrim').classList.remove('open')};

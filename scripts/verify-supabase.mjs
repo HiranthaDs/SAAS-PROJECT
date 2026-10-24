@@ -22,15 +22,32 @@ await client.auth.signOut();
 
 const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const testEmail = `nexora-test-${Date.now()}@example.test`;
-const testUser = await admin.auth.admin.createUser({ email: testEmail, password: `Verify-${crypto.randomUUID()}!`, email_confirm: true, user_metadata: { full_name: 'Provisioning Test', company_name: 'Provisioning Test Co' } });
+const testPassword = `Verify-${crypto.randomUUID()}!`;
+const testUser = await admin.auth.admin.createUser({ email: testEmail, password: testPassword, email_confirm: true, user_metadata: { full_name: 'Provisioning Test', company_name: 'Provisioning Test Co' } });
 if (testUser.error) throw testUser.error;
 const testMembership = await admin.from('memberships').select('org_id,role').eq('user_id', testUser.data.user.id).single();
 if (testMembership.error) throw testMembership.error;
+const marker = crypto.randomUUID();
+const seededContacts = await admin.from('contacts').insert([
+  { org_id: orgId, name: `Admin private ${marker}`, created_by: signedIn.data.user.id },
+  { org_id: testMembership.data.org_id, name: `Tenant private ${marker}`, created_by: testUser.data.user.id },
+]);
+if (seededContacts.error) throw seededContacts.error;
+const tenantClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
+const tenantSignIn = await tenantClient.auth.signInWithPassword({ email: testEmail, password: testPassword });
+if (tenantSignIn.error) throw tenantSignIn.error;
+const visibleContacts = await tenantClient.from('contacts').select('org_id,name').like('name', `%${marker}`);
+if (visibleContacts.error) throw visibleContacts.error;
+const forbiddenInsert = await tenantClient.from('contacts').insert({ org_id: orgId, name: `Forbidden ${marker}` });
+const tenantIsolation = visibleContacts.data.length === 1 && visibleContacts.data[0].org_id === testMembership.data.org_id && Boolean(forbiddenInsert.error);
+await tenantClient.auth.signOut();
+await admin.from('contacts').delete().like('name', `%${marker}`);
 const deleted = await admin.auth.admin.deleteUser(testUser.data.user.id);
 if (deleted.error) throw deleted.error;
 console.log(JSON.stringify({
   authenticated: true,
   signupProvisioning: testMembership.data.role === 'owner',
+  tenantIsolation,
   workspace: membership.data.organizations.name,
   role: membership.data.role,
   records: {
