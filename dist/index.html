@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Nexora is a unified workspace for sales, finance, inventory, people, projects, marketing, and commerce." />
+  <meta name="theme-color" content="#172554" />
+  <title>Nexora — Business, in one place</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-row">
+        <button class="brand" data-route="overview" aria-label="Nexora home">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span>Nexora</span>
+        </button>
+        <button class="icon-button mobile-only" id="closeNav" aria-label="Close navigation" data-icon="x"></button>
+      </div>
+
+      <button class="workspace-switcher" id="workspaceButton">
+        <span class="workspace-avatar">AS</span>
+        <span><strong>Atlas Studio</strong><small>Main workspace</small></span>
+        <span class="chevron">⌄</span>
+      </button>
+
+      <nav class="main-nav" aria-label="Primary navigation">
+        <p class="nav-label">Workspace</p>
+        <button class="nav-item active" data-route="overview" data-icon="home"><span>Overview</span><kbd>G</kbd></button>
+        <button class="nav-item" data-route="sales" data-icon="target"><span>Sales & CRM</span><b class="nav-badge">12</b></button>
+        <button class="nav-item" data-route="finance" data-icon="wallet"><span>Finance</span></button>
+        <button class="nav-item" data-route="inventory" data-icon="boxes"><span>Inventory</span><b class="nav-dot warn"></b></button>
+        <button class="nav-item" data-route="manufacturing" data-icon="factory"><span>Manufacturing</span></button>
+        <button class="nav-item" data-route="people" data-icon="users"><span>People</span></button>
+        <button class="nav-item" data-route="services" data-icon="briefcase"><span>Projects & Services</span></button>
+        <button class="nav-item" data-route="marketing" data-icon="megaphone"><span>Marketing</span></button>
+        <button class="nav-item" data-route="commerce" data-icon="store"><span>Website & Commerce</span></button>
+        <button class="nav-item" data-route="productivity" data-icon="message"><span>Productivity</span><b class="nav-badge neutral">5</b></button>
+
+        <p class="nav-label space-top">Manage</p>
+        <button class="nav-item" data-route="apps" data-icon="grid"><span>Apps & Studio</span></button>
+        <button class="nav-item" data-route="settings" data-icon="settings"><span>Settings</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="plan-meter"><span><strong>Scale plan</strong><small>18 of 25 seats</small></span><b>72%</b></div>
+        <div class="meter"><i style="width:72%"></i></div>
+        <button class="help-link" id="helpButton" data-icon="help">Help center <span>↗</span></button>
+      </div>
+    </aside>
+
+    <div class="nav-scrim" id="navScrim"></div>
+
+    <main class="main-area">
+      <header class="topbar">
+        <button class="icon-button mobile-only" id="openNav" aria-label="Open navigation" data-icon="menu"></button>
+        <button class="search-trigger" id="searchTrigger" aria-label="Open global search">
+          <span data-icon="search">Search anything…</span>
+          <kbd>⌘ K</kbd>
+        </button>
+        <div class="top-actions">
+          <button class="icon-button" id="quickChat" aria-label="Messages" data-icon="message"><i class="status-dot"></i></button>
+          <button class="icon-button" id="notificationButton" aria-label="Notifications" data-icon="bell"><i class="status-count">4</i></button>
+          <button class="user-menu" id="userMenu"><span class="user-avatar">HD</span><span class="user-copy"><strong>Hirantha</strong><small>Administrator</small></span><span class="chevron">⌄</span></button>
+        </div>
+      </header>
+
+      <section class="page" id="page" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <div class="modal-layer" id="modalLayer" aria-hidden="true"></div>
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+  <template id="modalTemplate">
+    <div class="modal-backdrop" data-close-modal></div>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header><div><span class="eyebrow" id="modalEyebrow">New record</span><h2 id="modalTitle">Create</h2></div><button class="icon-button" data-close-modal data-icon="x" aria-label="Close"></button></header>
+      <div class="modal-body" id="modalBody"></div>
+    </section>
+  </template>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
