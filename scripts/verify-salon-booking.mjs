@@ -125,13 +125,26 @@ try {
   });
   if (!overCapacity.error?.message.includes('fully booked')) throw new Error('Staff capacity limit was not enforced');
 
+  const bookingDate = new Date(start.getTime() + 330 * 60 * 1000).toISOString().slice(0, 10);
+  const fullSlotAvailability = requireResult(await publicClient.rpc('get_public_salon_availability', {
+    p_slug: organization.booking_slug,
+    p_service_id: service.id,
+    p_from_date: bookingDate,
+    p_to_date: bookingDate,
+  }), 'Load slot availability');
+  const bookedSlot = fullSlotAvailability.days?.[0]?.slots?.find((slot) => slot.time === '10:00');
+  if (!bookedSlot || bookedSlot.available || bookedSlot.remaining !== 0) {
+    throw new Error('Fully booked time slot was not marked unavailable');
+  }
+
   const blockedStart = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const blockedDate = new Date(blockedStart.getTime() + 330 * 60 * 1000).toISOString().slice(0, 10);
   requireResult(await admin.from('salon_unavailability').insert({
     org_id: orgId,
     staff_id: null,
     kind: 'salon_closed',
-    starts_at: blockedStart.toISOString(),
-    ends_at: new Date(blockedStart.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    starts_at: new Date(`${blockedDate}T00:00:00+05:30`).toISOString(),
+    ends_at: new Date(`${blockedDate}T23:59:59+05:30`).toISOString(),
     reason: 'Verification closure',
   }), 'Create salon closure');
   const blockedBooking = await publicClient.rpc('book_public_salon_appointment', {
@@ -144,6 +157,15 @@ try {
     p_notes: '',
   });
   if (!blockedBooking.error?.message.includes('unavailable')) throw new Error('Salon closure was not enforced');
+  const closedDayAvailability = requireResult(await publicClient.rpc('get_public_salon_availability', {
+    p_slug: organization.booking_slug,
+    p_service_id: service.id,
+    p_from_date: blockedDate,
+    p_to_date: blockedDate,
+  }), 'Load closed day availability');
+  if (closedDayAvailability.days?.[0]?.available !== false || closedDayAvailability.days[0].slots.some((slot) => slot.available)) {
+    throw new Error('Closed date was not marked unavailable');
+  }
 
   const signedInClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -193,6 +215,7 @@ try {
     publicBooking: true,
     simultaneousCapacity: true,
     unavailability: true,
+    publicAvailabilityColours: true,
     serviceCatalogue: true,
     customerProfile: true,
     calendarAppointment: true,
