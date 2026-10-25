@@ -78,12 +78,14 @@ async function createManagedAccount(request,env){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
   let actor;try{actor=await requireSuperAdmin(request,env)}catch(error){return json({error:error.message},error.status||500)}
   let body;try{body=await request.json()}catch{return json({error:'Invalid request body'},400)}
-  const orgId=String(body.org_id||'');const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');const fullName=String(body.full_name||'').trim();const title=String(body.title||'').trim();const role=['viewer','member','manager','admin'].includes(body.role)?body.role:'member';
+  const orgId=String(body.org_id||'');const locationId=String(body.location_id||'');const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');const fullName=String(body.full_name||'').trim();const title=String(body.title||'').trim();const role=['viewer','member','manager','admin'].includes(body.role)?body.role:'member';
   if(!/^[0-9a-f-]{36}$/i.test(orgId))return json({error:'Choose a valid workspace.'},400);
+  if(!/^[0-9a-f-]{36}$/i.test(locationId))return json({error:'Choose a valid salon location.'},400);
   if(!/^\\S+@\\S+\\.\\S+$/.test(email))return json({error:'Enter a valid email address.'},400);
   if(password.length<10)return json({error:'Temporary password must contain at least 10 characters.'},400);
   if(!fullName)return json({error:'Full name is required.'},400);
-  try{const org=await serviceCall(env,'/rest/v1/organizations?id=eq.'+encodeURIComponent(orgId)+'&select=id,name');if(!org?.length)return json({error:'Workspace not found.'},404)}catch(error){return json({error:error.message},error.status||400)}
+  let locationRecord;
+  try{const org=await serviceCall(env,'/rest/v1/organizations?id=eq.'+encodeURIComponent(orgId)+'&select=id,name');if(!org?.length)return json({error:'Workspace not found.'},404);const locations=await serviceCall(env,'/rest/v1/salon_locations?id=eq.'+encodeURIComponent(locationId)+'&org_id=eq.'+encodeURIComponent(orgId)+'&active=eq.true&select=id,name,employee_login_slug');if(!locations?.length)return json({error:'Salon location not found or inactive.'},404);locationRecord=locations[0]}catch(error){return json({error:error.message},error.status||400)}
   let userId='';
   try{
     const created=await serviceCall(env,'/auth/v1/admin/users',{method:'POST',body:JSON.stringify({email,password,email_confirm:true,user_metadata:{full_name:fullName,company_name:fullName+' setup'}})});userId=created.id;
@@ -91,17 +93,17 @@ async function createManagedAccount(request,env){
     for(const membership of autoMemberships||[]){if(membership.org_id!==orgId)await serviceCall(env,'/rest/v1/organizations?id=eq.'+encodeURIComponent(membership.org_id)+'&owner_id=eq.'+encodeURIComponent(userId),{method:'DELETE',headers:{'Prefer':'return=minimal'}})}
     await serviceCall(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(userId),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({full_name:fullName,email,must_change_password:true})});
     await serviceCall(env,'/rest/v1/memberships?on_conflict=org_id,user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,role,status:'active'})});
-    await serviceCall(env,'/rest/v1/organization_user_access?on_conflict=org_id,user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,title:title||null,permissions:cleanPermissions(body.permissions),created_by:actor.id})});
-    await serviceCall(env,'/rest/v1/employees',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,name:fullName,email,role_title:title||'Workspace user',department:'Salon',employment_status:'active'})});
-    await auditAccount(env,orgId,actor.id,'account.created',userId,{account_email:email,full_name:fullName,role,title});
-    return json({created:true,user_id:userId},201);
+    await serviceCall(env,'/rest/v1/organization_user_access?on_conflict=org_id,user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,location_id:locationId,title:title||null,permissions:cleanPermissions(body.permissions),created_by:actor.id})});
+    await serviceCall(env,'/rest/v1/employees',{method:'POST',headers:{'Prefer':'return=minimal'},body:JSON.stringify({org_id:orgId,location_id:locationId,user_id:userId,name:fullName,email,role_title:title||'Workspace user',department:'Salon',employment_status:'active',bookable_for_appointments:true})});
+    await auditAccount(env,orgId,actor.id,'account.created',userId,{account_email:email,full_name:fullName,role,title,location_id:locationId,location_name:locationRecord.name});
+    return json({created:true,user_id:userId,location_id:locationId,employee_login_slug:locationRecord.employee_login_slug},201);
   }catch(error){if(userId){await serviceCall(env,'/rest/v1/employees?user_id=eq.'+encodeURIComponent(userId),{method:'DELETE',headers:{'Prefer':'return=minimal'}}).catch(()=>{});await serviceCall(env,'/auth/v1/admin/users/'+encodeURIComponent(userId),{method:'DELETE'}).catch(()=>{})}return json({error:error.message},error.status===422?409:(error.status||400))}
 }
 async function updateManagedAccount(request,env,userId){
   if(request.method!=='PATCH')return json({error:'Method not allowed'},405);
   let actor;try{actor=await requireSuperAdmin(request,env)}catch(error){return json({error:error.message},error.status||500)}
   let body;try{body=await request.json()}catch{return json({error:'Invalid request body'},400)}
-  const orgId=String(body.org_id||'');
+  const orgId=String(body.org_id||'');const locationId=String(body.location_id||'');
   try{
     const membership=await serviceCall(env,'/rest/v1/memberships?org_id=eq.'+encodeURIComponent(orgId)+'&user_id=eq.'+encodeURIComponent(userId)+'&select=user_id');if(!membership?.length)return json({error:'Workspace account not found.'},404);
     if(body.action==='reset_password'){
@@ -110,11 +112,14 @@ async function updateManagedAccount(request,env,userId){
       await serviceCall(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(userId),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({must_change_password:true})});
       await auditAccount(env,orgId,actor.id,'account.temporary_password_reset',userId);return json({updated:true});
     }
+    if(!/^[0-9a-f-]{36}$/i.test(locationId))return json({error:'Choose a valid salon location.'},400);
+    const locations=await serviceCall(env,'/rest/v1/salon_locations?id=eq.'+encodeURIComponent(locationId)+'&org_id=eq.'+encodeURIComponent(orgId)+'&active=eq.true&select=id,name');if(!locations?.length)return json({error:'Salon location not found or inactive.'},404);const locationRecord=locations[0];
     const role=['viewer','member','manager','admin'].includes(body.role)?body.role:'member';const status=['active','suspended'].includes(body.status)?body.status:'active';
     if(actor.id===userId&&status==='suspended')return json({error:'You cannot suspend your own super-admin account.'},400);
     await serviceCall(env,'/rest/v1/memberships?org_id=eq.'+encodeURIComponent(orgId)+'&user_id=eq.'+encodeURIComponent(userId),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({role,status})});
-    await serviceCall(env,'/rest/v1/organization_user_access?on_conflict=org_id,user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,title:String(body.title||'').trim()||null,permissions:cleanPermissions(body.permissions),created_by:actor.id})});
-    await auditAccount(env,orgId,actor.id,'account.permissions_updated',userId,{role,status,title:body.title||'',permissions:cleanPermissions(body.permissions)});return json({updated:true});
+    await serviceCall(env,'/rest/v1/organization_user_access?on_conflict=org_id,user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({org_id:orgId,user_id:userId,location_id:locationId,title:String(body.title||'').trim()||null,permissions:cleanPermissions(body.permissions),created_by:actor.id})});
+    await serviceCall(env,'/rest/v1/employees?org_id=eq.'+encodeURIComponent(orgId)+'&user_id=eq.'+encodeURIComponent(userId),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({location_id:locationId,role_title:String(body.title||'').trim()||'Workspace user',employment_status:status==='active'?'active':'inactive'})});
+    await auditAccount(env,orgId,actor.id,'account.permissions_updated',userId,{role,status,title:body.title||'',location_id:locationId,location_name:locationRecord.name,permissions:cleanPermissions(body.permissions)});return json({updated:true});
   }catch(error){return json({error:error.message},error.status||400)}
 }
 export default {async fetch(request,env){

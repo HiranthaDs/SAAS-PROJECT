@@ -13,6 +13,7 @@
     "verify:retail-erp": "node scripts/verify-retail-erp.mjs",
     "verify:industries": "node scripts/verify-industry-profiles.mjs",
     "verify:salon": "node scripts/verify-salon-booking.mjs",
+    "verify:salon-locations": "node scripts/verify-salon-locations.mjs",
     "verify:signup-api": "node scripts/verify-signup-api.mjs"
   },
   "dependencies": {
