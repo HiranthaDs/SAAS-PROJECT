@@ -58,12 +58,19 @@ try {
     preferences: { onboarding_completed: true, opening_time: '09:00', closing_time: '19:00', booking_interval: 30 },
   }).eq('org_id', orgId), 'Configure salon workspace');
 
-  requireResult(await admin.from('employees').insert({
+  requireResult(await admin.from('employees').insert([{
     org_id: orgId,
     name: 'Test Stylist',
     role_title: 'Stylist',
     department: 'Salon',
-  }), 'Create stylist');
+    bookable_for_appointments: true,
+  }, {
+    org_id: orgId,
+    name: 'Second Stylist',
+    role_title: 'Colourist',
+    department: 'Salon',
+    bookable_for_appointments: true,
+  }]), 'Create bookable salon staff');
 
   const service = requireResult(await admin.from('salon_services').insert({
     org_id: orgId,
@@ -81,6 +88,7 @@ try {
   if (bookingPage.services?.[0]?.id !== service.id || bookingPage.services[0].description !== 'Consultation, treatment, and finish') {
     throw new Error('Public service catalogue is not connected');
   }
+  if (bookingPage.capacity !== 2) throw new Error('Public booking capacity does not match bookable staff');
 
   const start = new Date(Date.now() + 48 * 60 * 60 * 1000);
   start.setUTCHours(4, 30, 0, 0);
@@ -93,6 +101,49 @@ try {
     p_starts_at: start.toISOString(),
     p_notes: 'Automated booking verification',
   }), 'Create public appointment');
+
+  const simultaneousBooking = requireResult(await publicClient.rpc('book_public_salon_appointment', {
+    p_slug: organization.booking_slug,
+    p_service_id: service.id,
+    p_customer_name: 'Second Public Client',
+    p_customer_phone: '077 555 0200',
+    p_customer_email: '',
+    p_starts_at: start.toISOString(),
+    p_notes: 'Capacity verification',
+  }), 'Create second simultaneous appointment');
+  if (!simultaneousBooking.staff || simultaneousBooking.staff === booking.staff) {
+    throw new Error('Simultaneous bookings were not assigned to separate staff');
+  }
+  const overCapacity = await publicClient.rpc('book_public_salon_appointment', {
+    p_slug: organization.booking_slug,
+    p_service_id: service.id,
+    p_customer_name: 'Over Capacity Client',
+    p_customer_phone: '077 555 0201',
+    p_customer_email: '',
+    p_starts_at: start.toISOString(),
+    p_notes: '',
+  });
+  if (!overCapacity.error?.message.includes('fully booked')) throw new Error('Staff capacity limit was not enforced');
+
+  const blockedStart = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  requireResult(await admin.from('salon_unavailability').insert({
+    org_id: orgId,
+    staff_id: null,
+    kind: 'salon_closed',
+    starts_at: blockedStart.toISOString(),
+    ends_at: new Date(blockedStart.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+    reason: 'Verification closure',
+  }), 'Create salon closure');
+  const blockedBooking = await publicClient.rpc('book_public_salon_appointment', {
+    p_slug: organization.booking_slug,
+    p_service_id: service.id,
+    p_customer_name: 'Closed Time Client',
+    p_customer_phone: '077 555 0202',
+    p_customer_email: '',
+    p_starts_at: blockedStart.toISOString(),
+    p_notes: '',
+  });
+  if (!blockedBooking.error?.message.includes('unavailable')) throw new Error('Salon closure was not enforced');
 
   const signedInClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -140,6 +191,8 @@ try {
   await signedInClient.auth.signOut();
   console.log(JSON.stringify({
     publicBooking: true,
+    simultaneousCapacity: true,
+    unavailability: true,
     serviceCatalogue: true,
     customerProfile: true,
     calendarAppointment: true,
