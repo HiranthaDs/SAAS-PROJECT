@@ -79,8 +79,8 @@ try {
   required(await admin.from('organization_settings').insert({ org_id: legacyOrgId, currency: 'LKR', enabled_modules: [], preferences: { onboarding_completed: false } }), 'Create legacy workspace settings');
 
   required(await sharedLoginClient.auth.signInWithPassword({ email: ownerEmail, password: ownerPassword }), 'Sign in administrator before branch switch');
-  const rejectedAdminPortal = await sharedLoginClient.rpc('validate_employee_login_portal', { p_slug: branch.employee_login_slug });
-  if (!rejectedAdminPortal.error?.message.includes('Administrators must use the main login page')) throw new Error('Administrator was not kept on the normal-login rule');
+  const adminPortal = required(await sharedLoginClient.rpc('validate_employee_login_portal', { p_slug: branch.employee_login_slug }), 'Validate administrator location login');
+  if (adminPortal.access_kind !== 'workspace_owner' || adminPortal.location_id !== branch.id) throw new Error('Administrator could not use their own branch login');
 
   required(await sharedLoginClient.auth.signInWithPassword({ email: employeeEmail, password: employeePassword }), 'Sign in branch account after administrator session');
   const branchPortal = required(await sharedLoginClient.rpc('validate_employee_login_portal', { p_slug: branch.employee_login_slug }), 'Validate permanent branch login');
@@ -114,6 +114,7 @@ try {
 
   console.log(JSON.stringify({
     branchAccountCreatedThroughAdminApi: true,
+    administratorLocationLoginWorks: true,
     permanentBranchLoginWorks: true,
     branchWorkspaceBootstrapWorks: true,
     legacyMembershipDoesNotOverrideBranch: true,

@@ -142,18 +142,30 @@ try {
   if (branchIdentity.workspace !== `Browser Salon ${marker}` || !/manager|member/i.test(branchIdentity.role || '')) throw new Error(`Incorrect branch UI identity: ${JSON.stringify(branchIdentity)}`);
 
   await evaluate(`location.href='/?login=admin'`);
+  await waitFor(`document.querySelector('#signinForm') && !document.querySelector('#authShell')?.classList.contains('hidden')`, 'Main login for assigned manager');
+  await fillAndSubmit('#signinForm', { email: employeeEmail, password: privatePassword });
+  await waitFor(`!document.querySelector('#appShell')?.classList.contains('hidden') && /manager/i.test(document.querySelector('.user-copy small')?.textContent||'')`, 'Assigned manager through main login');
+
+  await evaluate(`location.href='/?login=admin'`);
   await waitFor(`document.querySelector('#signinForm') && !document.querySelector('#authShell')?.classList.contains('hidden')`, 'Normal administrator login');
   await fillAndSubmit('#signinForm', { email: ownerEmail, password: ownerPassword });
   await waitFor(`!document.querySelector('#appShell')?.classList.contains('hidden') && /Workspace super admin/.test(document.querySelector('.user-copy small')?.textContent||'')`, 'Workspace administrator dashboard');
   const adminIdentity = await evaluate(`({workspace:document.querySelector('.workspace-switcher strong')?.textContent,user:document.querySelector('.user-copy strong')?.textContent,role:document.querySelector('.user-copy small')?.textContent,authError:document.querySelector('#authError')?.textContent})`);
   if (adminIdentity.workspace !== `Browser Salon ${marker}`) throw new Error(`Incorrect administrator UI identity: ${JSON.stringify(adminIdentity)}`);
+
+  await evaluate(`location.href=${JSON.stringify(`${appUrl}/staff/${branch.employee_login_slug}`)}`);
+  await waitFor(`!document.querySelector('#appShell')?.classList.contains('hidden') && /Workspace super admin/.test(document.querySelector('.user-copy small')?.textContent||'')`, 'Administrator through branch location login');
+  const adminBranchIdentity = await evaluate(`({workspace:document.querySelector('.workspace-switcher strong')?.textContent,role:document.querySelector('.user-copy small')?.textContent,portalError:document.querySelector('.employee-login-error')?.textContent})`);
+  if (adminBranchIdentity.workspace !== `Browser Salon ${marker}` || adminBranchIdentity.portalError) throw new Error(`Incorrect administrator branch login: ${JSON.stringify(adminBranchIdentity)}`);
   if (browserErrors.length) throw new Error(`Browser errors: ${browserErrors.join(' | ')}`);
 
   console.log(JSON.stringify({
     browserBranchLogin: true,
     browserFirstPasswordChange: true,
     browserBranchWorkspaceLoaded: true,
+    browserManagerMainLogin: true,
     browserAdminSwitch: true,
+    browserAdminBranchLogin: true,
     uncaughtBrowserErrors: 0,
   }));
 } finally {
