@@ -14,13 +14,17 @@ const allowedPermissions = ['salon_view','salon_create','salon_move','salon_appr
 const cleanPermissions = value => Object.fromEntries(allowedPermissions.map(key => [key, value?.[key] === true]));
 const readBody = async req => { let raw = ''; for await (const chunk of req) raw += chunk; return JSON.parse(raw || '{}'); };
 
-async function requireSuperAdmin(req) {
+async function requireSuperAdmin(req, orgId) {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) throw Object.assign(new Error('Sign in is required.'), { status: 401 });
   const userResult = await admin.auth.getUser(token);
   if (userResult.error || !userResult.data.user) throw Object.assign(new Error('Your session is invalid or expired.'), { status: 401 });
   const profileResult = await admin.from('profiles').select('platform_role').eq('id', userResult.data.user.id).single();
-  if (profileResult.error || profileResult.data?.platform_role !== 'super_admin') throw Object.assign(new Error('Only a super administrator can manage accounts.'), { status: 403 });
+  if (profileResult.error) throw Object.assign(new Error('Unable to verify administrator access.'), { status: 403 });
+  if (profileResult.data?.platform_role === 'system_admin') return userResult.data.user;
+  if (profileResult.data?.platform_role !== 'super_admin') throw Object.assign(new Error('Only a workspace super administrator can manage accounts.'), { status: 403 });
+  const ownership = await admin.from('memberships').select('role,status,organizations(account_status)').eq('org_id', orgId).eq('user_id', userResult.data.user.id).eq('role', 'owner').maybeSingle();
+  if (ownership.error || ownership.data?.status !== 'active' || ownership.data?.organizations?.account_status !== 'active') throw Object.assign(new Error('You can manage accounts only in your own active workspace.'), { status: 403 });
   return userResult.data.user;
 }
 
@@ -31,9 +35,9 @@ async function auditAccountAction(orgId, actorId, action, userId, metadata = {})
 
 async function createManagedAccount(req, res) {
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
-  let actor; try { actor = await requireSuperAdmin(req); } catch (error) { return respond(res, error.status || 500, { error: error.message }); }
   let body; try { body = await readBody(req); } catch { return respond(res, 400, { error: 'Invalid request body' }); }
   const orgId = String(body.org_id || '');
+  let actor; try { actor = await requireSuperAdmin(req, orgId); } catch (error) { return respond(res, error.status || 500, { error: error.message }); }
   const locationId = String(body.location_id || '');
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
@@ -49,7 +53,7 @@ async function createManagedAccount(req, res) {
   if (orgResult.error || !orgResult.data) return respond(res, 404, { error: 'Workspace not found.' });
   const locationResult = await admin.from('salon_locations').select('id,name,employee_login_slug').eq('id', locationId).eq('org_id', orgId).eq('active', true).maybeSingle();
   if (locationResult.error || !locationResult.data) return respond(res, 404, { error: 'Salon location not found or inactive.' });
-  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, company_name: `${fullName} setup` } });
+  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, company_name: `${fullName} setup`, provisioning_kind: 'employee' } });
   if (created.error) return respond(res, created.error.status === 422 ? 409 : (created.error.status || 400), { error: created.error.message });
   const userId = created.data.user.id;
   try {
@@ -72,9 +76,9 @@ async function createManagedAccount(req, res) {
 
 async function updateManagedAccount(req, res, userId) {
   if (req.method !== 'PATCH') return respond(res, 405, { error: 'Method not allowed' });
-  let actor; try { actor = await requireSuperAdmin(req); } catch (error) { return respond(res, error.status || 500, { error: error.message }); }
   let body; try { body = await readBody(req); } catch { return respond(res, 400, { error: 'Invalid request body' }); }
   const orgId = String(body.org_id || '');
+  let actor; try { actor = await requireSuperAdmin(req, orgId); } catch (error) { return respond(res, error.status || 500, { error: error.message }); }
   const locationId = String(body.location_id || '');
   const membershipResult = await admin.from('memberships').select('user_id').eq('org_id', orgId).eq('user_id', userId).maybeSingle();
   if (membershipResult.error || !membershipResult.data) return respond(res, 404, { error: 'Workspace account not found.' });
@@ -114,8 +118,9 @@ createServer(async (req, res) => {
     if (!/^\S+@\S+\.\S+$/.test(email)) return respond(res, 400, { error: 'Enter a valid email address.' });
     if (password.length < 8) return respond(res, 400, { error: 'Password must contain at least 8 characters.' });
     if (!fullName) return respond(res, 400, { error: 'Your name is required.' });
-    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, company_name: companyName } });
+    const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, company_name: companyName, provisioning_kind: 'workspace_owner' } });
     if (created.error) return respond(res, created.error.status === 422 ? 409 : (created.error.status || 400), { error: created.error.message });
+    const promoted = await admin.from('profiles').update({ platform_role: 'super_admin' }).eq('id', created.data.user.id);if(promoted.error){await admin.auth.admin.deleteUser(created.data.user.id);return respond(res, 400, { error: promoted.error.message });}
     return respond(res, 201, { created: true, user_id: created.data.user.id });
   }
   const relative = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '');

@@ -14,6 +14,9 @@
     "verify:industries": "node scripts/verify-industry-profiles.mjs",
     "verify:salon": "node scripts/verify-salon-booking.mjs",
     "verify:salon-locations": "node scripts/verify-salon-locations.mjs",
+    "verify:admin-hierarchy": "node scripts/verify-admin-hierarchy.mjs",
+    "verify:login-paths": "node scripts/verify-login-paths.mjs",
+    "verify:browser-login": "node scripts/verify-browser-login-flow.mjs",
     "verify:signup-api": "node scripts/verify-signup-api.mjs"
   },
   "dependencies": {

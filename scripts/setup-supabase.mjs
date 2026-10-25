@@ -34,7 +34,8 @@ if (SUPER_ADMIN_EMAIL && SUPER_ADMIN_PASSWORD) {
   }
   const authUpdated = await admin.auth.admin.updateUserById(user.id, { password: SUPER_ADMIN_PASSWORD, email_confirm: true, user_metadata: { full_name: 'System Administrator', company_name: 'Hich Solutions' } });
   if (authUpdated.error) throw authUpdated.error;
-  const profile = await admin.from('profiles').upsert({ id: user.id, email: SUPER_ADMIN_EMAIL, platform_role: 'super_admin', full_name: 'System Administrator' });
+  const setupRole = SUPER_ADMIN_EMAIL.toLowerCase() === 'hiranthadiass4@gmail.com' ? 'system_admin' : 'super_admin';
+  const profile = await admin.from('profiles').upsert({ id: user.id, email: SUPER_ADMIN_EMAIL, platform_role: setupRole, full_name: setupRole === 'system_admin' ? 'System Administrator' : 'Workspace Super Administrator' });
   if (profile.error) throw profile.error;
   let membership = await admin.from('memberships').select('org_id').eq('user_id', user.id).limit(1).maybeSingle();
   if (membership.error) throw membership.error;

@@ -44,7 +44,7 @@ async function serviceCall(env,path,options={}){
   if(!response.ok){const error=new Error(result?.msg||result?.message||result?.error_description||result?.details||'Account service request failed.');error.status=response.status;throw error}
   return result;
 }
-async function requireSuperAdmin(request,env){
+async function requireSuperAdmin(request,env,orgId){
   if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY){const error=new Error('Account service is not configured.');error.status=503;throw error}
   const token=String(request.headers.get('authorization')||'').replace(/^Bearer\\s+/i,'');
   if(!token){const error=new Error('Sign in is required.');error.status=401;throw error}
@@ -52,7 +52,10 @@ async function requireSuperAdmin(request,env){
   const user=await response.json().catch(()=>null);
   if(!response.ok||!user?.id){const error=new Error('Your session is invalid or expired.');error.status=401;throw error}
   const profiles=await serviceCall(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(user.id)+'&select=platform_role');
-  if(profiles?.[0]?.platform_role!=='super_admin'){const error=new Error('Only a super administrator can manage accounts.');error.status=403;throw error}
+  if(profiles?.[0]?.platform_role==='system_admin')return user;
+  if(profiles?.[0]?.platform_role!=='super_admin'){const error=new Error('Only a workspace super administrator can manage accounts.');error.status=403;throw error}
+  const ownership=await serviceCall(env,'/rest/v1/memberships?org_id=eq.'+encodeURIComponent(orgId)+'&user_id=eq.'+encodeURIComponent(user.id)+'&role=eq.owner&status=eq.active&select=role,status,organizations(account_status)');
+  if(!ownership?.length||ownership[0]?.organizations?.account_status!=='active'){const error=new Error('You can manage accounts only in your own active workspace.');error.status=403;throw error}
   return user;
 }
 async function auditAccount(env,orgId,actorId,action,userId,metadata={}){
@@ -69,16 +72,17 @@ async function createAccount(request,env){
   if(password.length<8)return json({error:'Password must contain at least 8 characters.'},400);
   if(!fullName)return json({error:'Your name is required.'},400);
   if(!env.SUPABASE_URL||!env.SUPABASE_SECRET_KEY)return json({error:'Account service is not configured.'},503);
-  const response=await fetch(env.SUPABASE_URL+'/auth/v1/admin/users',{method:'POST',headers:{'content-type':'application/json','apikey':env.SUPABASE_SECRET_KEY,'authorization':'Bearer '+env.SUPABASE_SECRET_KEY},body:JSON.stringify({email,password,email_confirm:true,user_metadata:{full_name:fullName,company_name:companyName}})});
+  const response=await fetch(env.SUPABASE_URL+'/auth/v1/admin/users',{method:'POST',headers:{'content-type':'application/json','apikey':env.SUPABASE_SECRET_KEY,'authorization':'Bearer '+env.SUPABASE_SECRET_KEY},body:JSON.stringify({email,password,email_confirm:true,user_metadata:{full_name:fullName,company_name:companyName,provisioning_kind:'workspace_owner'}})});
   const result=await response.json().catch(()=>({}));
   if(!response.ok)return json({error:result.msg||result.message||result.error_description||'Unable to create account.'},response.status===422?409:response.status);
+  try{await serviceCall(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(result.id),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({platform_role:'super_admin'})})}catch(error){await serviceCall(env,'/auth/v1/admin/users/'+encodeURIComponent(result.id),{method:'DELETE'}).catch(()=>{});return json({error:error.message},error.status||400)}
   return json({created:true,user_id:result.id},201);
 }
 async function createManagedAccount(request,env){
   if(request.method!=='POST')return json({error:'Method not allowed'},405);
-  let actor;try{actor=await requireSuperAdmin(request,env)}catch(error){return json({error:error.message},error.status||500)}
   let body;try{body=await request.json()}catch{return json({error:'Invalid request body'},400)}
   const orgId=String(body.org_id||'');const locationId=String(body.location_id||'');const email=String(body.email||'').trim().toLowerCase();const password=String(body.password||'');const fullName=String(body.full_name||'').trim();const title=String(body.title||'').trim();const role=['viewer','member','manager','admin'].includes(body.role)?body.role:'member';
+  let actor;try{actor=await requireSuperAdmin(request,env,orgId)}catch(error){return json({error:error.message},error.status||500)}
   if(!/^[0-9a-f-]{36}$/i.test(orgId))return json({error:'Choose a valid workspace.'},400);
   if(!/^[0-9a-f-]{36}$/i.test(locationId))return json({error:'Choose a valid salon location.'},400);
   if(!/^\\S+@\\S+\\.\\S+$/.test(email))return json({error:'Enter a valid email address.'},400);
@@ -88,7 +92,7 @@ async function createManagedAccount(request,env){
   try{const org=await serviceCall(env,'/rest/v1/organizations?id=eq.'+encodeURIComponent(orgId)+'&select=id,name');if(!org?.length)return json({error:'Workspace not found.'},404);const locations=await serviceCall(env,'/rest/v1/salon_locations?id=eq.'+encodeURIComponent(locationId)+'&org_id=eq.'+encodeURIComponent(orgId)+'&active=eq.true&select=id,name,employee_login_slug');if(!locations?.length)return json({error:'Salon location not found or inactive.'},404);locationRecord=locations[0]}catch(error){return json({error:error.message},error.status||400)}
   let userId='';
   try{
-    const created=await serviceCall(env,'/auth/v1/admin/users',{method:'POST',body:JSON.stringify({email,password,email_confirm:true,user_metadata:{full_name:fullName,company_name:fullName+' setup'}})});userId=created.id;
+    const created=await serviceCall(env,'/auth/v1/admin/users',{method:'POST',body:JSON.stringify({email,password,email_confirm:true,user_metadata:{full_name:fullName,company_name:fullName+' setup',provisioning_kind:'employee'}})});userId=created.id;
     const autoMemberships=await serviceCall(env,'/rest/v1/memberships?user_id=eq.'+encodeURIComponent(userId)+'&select=org_id');
     for(const membership of autoMemberships||[]){if(membership.org_id!==orgId)await serviceCall(env,'/rest/v1/organizations?id=eq.'+encodeURIComponent(membership.org_id)+'&owner_id=eq.'+encodeURIComponent(userId),{method:'DELETE',headers:{'Prefer':'return=minimal'}})}
     await serviceCall(env,'/rest/v1/profiles?id=eq.'+encodeURIComponent(userId),{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({full_name:fullName,email,must_change_password:true})});
@@ -101,9 +105,9 @@ async function createManagedAccount(request,env){
 }
 async function updateManagedAccount(request,env,userId){
   if(request.method!=='PATCH')return json({error:'Method not allowed'},405);
-  let actor;try{actor=await requireSuperAdmin(request,env)}catch(error){return json({error:error.message},error.status||500)}
   let body;try{body=await request.json()}catch{return json({error:'Invalid request body'},400)}
   const orgId=String(body.org_id||'');const locationId=String(body.location_id||'');
+  let actor;try{actor=await requireSuperAdmin(request,env,orgId)}catch(error){return json({error:error.message},error.status||500)}
   try{
     const membership=await serviceCall(env,'/rest/v1/memberships?org_id=eq.'+encodeURIComponent(orgId)+'&user_id=eq.'+encodeURIComponent(userId)+'&select=user_id');if(!membership?.length)return json({error:'Workspace account not found.'},404);
     if(body.action==='reset_password'){

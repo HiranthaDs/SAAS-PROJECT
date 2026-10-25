@@ -5,12 +5,13 @@ config({ path: '.env.local' });
 
 const email = `hich-api-${Date.now()}@outlook.com`;
 const password = `Api-${crypto.randomUUID()}!`;
+const appUrl = String(process.env.APP_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const browser = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false } });
 const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 let userId;
 
 try {
-  const response = await fetch('http://127.0.0.1:3000/api/signup', {
+  const response = await fetch(`${appUrl}/api/signup`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password, full_name: 'API Signup Test' })

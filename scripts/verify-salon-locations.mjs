@@ -31,7 +31,7 @@ try {
   const primary = required(await ownerClient.from('salon_locations').select('*').eq('org_id', orgId).eq('is_primary', true).single(), 'Load primary location');
   const secondary = required(await ownerClient.rpc('create_salon_location', { p_org_id: orgId, p_name: `Negombo ${marker}`, p_code: 'NEG', p_city: 'Negombo', p_address: 'Negombo', p_phone: '', p_is_primary: false }), 'Create second location');
 
-  const employee = required(await admin.auth.admin.createUser({ email: `location-employee-${marker}@example.test`, password, email_confirm: true, user_metadata: { full_name: 'Branch Employee', company_name: 'Employee setup' } }), 'Create employee').user;
+  const employee = required(await admin.auth.admin.createUser({ email: `location-employee-${marker}@example.test`, password, email_confirm: true, user_metadata: { full_name: 'Branch Employee', company_name: 'Employee setup', provisioning_kind: 'employee' } }), 'Create employee').user;
   employeeUserId = employee.id;
   required(await admin.from('organizations').delete().eq('owner_id', employeeUserId), 'Remove automatic employee workspace');
   required(await admin.from('memberships').insert({ org_id: orgId, user_id: employeeUserId, role: 'member', status: 'active' }), 'Assign membership');
