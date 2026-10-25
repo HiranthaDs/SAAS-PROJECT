@@ -6,8 +6,14 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node --check dist/assets/app.js && node --check utils/supabase/client.js",
+    "dev": "node scripts/dev-server.mjs",
     "setup:supabase": "node scripts/setup-supabase.mjs",
-    "verify:supabase": "node scripts/verify-supabase.mjs"
+    "verify:supabase": "node scripts/verify-supabase.mjs",
+    "verify:order-to-cash": "node scripts/verify-order-to-cash.mjs",
+    "verify:retail-erp": "node scripts/verify-retail-erp.mjs",
+    "verify:industries": "node scripts/verify-industry-profiles.mjs",
+    "verify:salon": "node scripts/verify-salon-booking.mjs",
+    "verify:signup-api": "node scripts/verify-signup-api.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

@@ -66,10 +66,10 @@ if (SUPER_ADMIN_EMAIL && SUPER_ADMIN_PASSWORD) {
         { org_id: orgId, number: 'INV-2026-0479', customer: 'Studio Kind', issue_date: '2026-10-21', subtotal: 4920, status: 'Overdue', created_by: user.id },
       ]),
       admin.from('products').insert([
-        { org_id: orgId, sku: 'NX-1001', name: 'Ergo Task Chair', category: 'Furniture', stock: 128, forecast: 161, reorder_level: 20, price: 349 },
-        { org_id: orgId, sku: 'NX-1002', name: 'Walnut Standing Desk', category: 'Furniture', stock: 14, forecast: 8, reorder_level: 20, price: 799 },
-        { org_id: orgId, sku: 'NX-2004', name: 'Studio Lamp', category: 'Lighting', stock: 67, forecast: 72, reorder_level: 15, price: 129 },
-        { org_id: orgId, sku: 'NX-3012', name: 'Acoustic Panel Set', category: 'Workspace', stock: 8, forecast: 4, reorder_level: 20, price: 245 },
+        { org_id: orgId, sku: 'GR-1001', barcode: '479100100001', name: 'Samba Rice 5kg', category: 'Rice & grains', stock: 128, forecast: 161, reorder_level: 20, cost: 2050, price: 2390 },
+        { org_id: orgId, sku: 'GR-1002', barcode: '479100100002', name: 'Fresh Milk 1L', category: 'Dairy', stock: 14, forecast: 8, reorder_level: 20, cost: 370, price: 440 },
+        { org_id: orgId, sku: 'GR-2004', barcode: '479100100003', name: 'Coconut Oil 1L', category: 'Cooking', stock: 67, forecast: 72, reorder_level: 15, cost: 780, price: 920 },
+        { org_id: orgId, sku: 'GR-3012', barcode: '479100100004', name: 'Brown Sugar 1kg', category: 'Essentials', stock: 8, forecast: 4, reorder_level: 20, cost: 285, price: 340 },
       ]),
       admin.from('employees').insert([
         { org_id: orgId, user_id: user.id, name: 'System Administrator', email: SUPER_ADMIN_EMAIL, role_title: 'Platform Administrator', department: 'Leadership' },

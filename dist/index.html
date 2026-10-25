@@ -9,10 +9,72 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/styles.css" />
+  <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
-  <section class="auth-shell" id="authShell">
+  <div class="marketing-site" id="marketingSite">
+    <header class="marketing-nav" id="top">
+      <a class="marketing-brand" href="#top" aria-label="Hich Solutions home"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><b>Hich Solutions</b></a>
+      <nav aria-label="Public navigation"><a href="#apps">Apps</a><a href="#industries">Industries</a><a href="#platform">Community</a><a href="#pricing">Pricing</a><a href="#help">Help</a></nav>
+      <div class="marketing-actions"><button class="marketing-login" data-show-auth="signin">Sign in</button><button class="marketing-cta" data-show-auth="signup">Start free</button><button class="marketing-menu" id="marketingMenu" aria-label="Open menu" data-icon="menu"></button></div>
+    </header>
+
+    <main>
+      <section class="marketing-hero">
+        <div class="hero-orb hero-orb-one"></div><div class="hero-orb hero-orb-two"></div>
+        <div class="hero-copy">
+          <span class="hero-pill"><i></i> 70 connected business applications</span>
+          <h1>All your business.<br><em>One clear platform.</em></h1>
+          <p>Replace scattered tools with one intelligent system for sales, finance, operations, people, marketing, services, commerce, and specialized industries.</p>
+          <div class="hero-buttons"><button class="hero-primary" data-show-auth="signup">Start now — it’s free <span>→</span></button><a class="hero-secondary" href="#apps">Explore all apps</a></div>
+          <div class="hero-note"><span>&#10003; No credit card</span><span>&#10003; Instant workspace</span><span>&#10003; Your data stays yours</span></div>
+        </div>
+        <div class="hero-price"><span>Launch offer</span><div><sup>US$</sup><strong>7.25</strong></div><p>per user / month<br><b>for all apps</b></p></div>
+        <div class="hero-product">
+          <div class="product-window"><div class="product-bar"><span></span><span></span><span></span><b>Hich Solutions</b></div><div class="product-sidebar"><i></i><i></i><i></i><i></i><i></i></div><div class="product-content"><div class="product-title"><span></span><b></b></div><div class="product-kpis"><i></i><i></i><i></i></div><div class="product-chart"><svg viewBox="0 0 400 150" preserveAspectRatio="none"><path d="M0 130 C55 120,60 95,110 103 S180 78,220 84 S285 45,325 53 S365 26,400 20" fill="none" stroke="currentColor" stroke-width="4"/><path d="M0 130 C55 120,60 95,110 103 S180 78,220 84 S285 45,325 53 S365 26,400 20 L400 150 L0 150Z" fill="currentColor" opacity=".08"/></svg></div></div></div>
+          <div class="floating-card floating-one"><span class="float-icon green" data-icon="check"></span><div><b>Payment received</b><small>Invoice HS-1048 · $12,840</small></div></div>
+          <div class="floating-card floating-two"><span class="float-icon orange" data-icon="boxes"></span><div><b>Order ready</b><small>Warehouse · 24 items</small></div></div>
+        </div>
+      </section>
+
+      <section class="trusted-strip"><span>One source of truth for every team</span><div><b>SALES</b><b>FINANCE</b><b>OPERATIONS</b><b>PEOPLE</b><b>COMMERCE</b><b>SERVICES</b></div></section>
+
+      <section class="marketing-section apps-showcase" id="apps">
+        <div class="section-heading centered"><span class="section-kicker">One need. One app.</span><h2>Everything works better<br>when everything works together.</h2><p>Start with one application. Add the rest whenever you need them. Your contacts, products, documents, activities, and reporting remain connected.</p></div>
+        <div class="app-cloud">
+          <button class="cloud-app c1" data-marketing-app="Accounting"><span data-icon="wallet"></span><b>Accounting</b></button><button class="cloud-app c2" data-marketing-app="Knowledge"><span data-icon="book"></span><b>Knowledge</b></button><button class="cloud-app c3" data-marketing-app="Sign"><span data-icon="check"></span><b>Sign</b></button><button class="cloud-app c4" data-marketing-app="CRM"><span data-icon="target"></span><b>CRM</b></button><button class="cloud-app c5" data-marketing-app="Studio"><span data-icon="grid"></span><b>Studio</b></button>
+          <button class="cloud-app c6" data-marketing-app="Subscriptions"><span data-icon="calendar"></span><b>Subscriptions</b></button><button class="cloud-app c7" data-marketing-app="AI Assistant"><span data-icon="trend"></span><b>AI</b></button><button class="cloud-app c8" data-marketing-app="Point of Sale"><span data-icon="store"></span><b>Point of Sale</b></button><button class="cloud-app c9" data-marketing-app="Discuss"><span data-icon="message"></span><b>Discuss</b></button><button class="cloud-app c10" data-marketing-app="Documents"><span data-icon="book"></span><b>Documents</b></button>
+          <button class="cloud-app c11" data-marketing-app="Projects"><span data-icon="briefcase"></span><b>Project</b></button><button class="cloud-app c12" data-marketing-app="Timesheets"><span data-icon="clock"></span><b>Timesheets</b></button><button class="cloud-app c13" data-marketing-app="Field Service"><span data-icon="settings"></span><b>Field Service</b></button><button class="cloud-app c14" data-marketing-app="Planning"><span data-icon="calendar"></span><b>Planning</b></button><button class="cloud-app c15" data-marketing-app="Helpdesk"><span data-icon="help"></span><b>Helpdesk</b></button>
+          <button class="cloud-app c16" data-marketing-app="eCommerce"><span data-icon="cart"></span><b>eCommerce</b></button><button class="cloud-app c17" data-marketing-app="Website"><span data-icon="store"></span><b>Website</b></button><button class="cloud-app c18" data-marketing-app="Email Marketing"><span data-icon="mail"></span><b>Email Marketing</b></button><button class="cloud-app c19" data-marketing-app="Purchase"><span data-icon="cart"></span><b>Purchase</b></button><button class="cloud-app c20" data-marketing-app="Inventory"><span data-icon="boxes"></span><b>Inventory</b></button>
+          <button class="cloud-app c21" data-marketing-app="Manufacturing"><span data-icon="factory"></span><b>Manufacturing</b></button><button class="cloud-app c22" data-marketing-app="Sales"><span data-icon="receipt"></span><b>Sales</b></button><button class="cloud-app c23" data-marketing-app="Employees"><span data-icon="users"></span><b>HR</b></button><button class="cloud-app c24" data-marketing-app="Spreadsheets"><span data-icon="chart"></span><b>Dashboard</b></button><button class="cloud-app c25" data-show-auth="signup"><span data-icon="plus"></span><b>View all 70 apps</b></button>
+        </div>
+        <div class="apps-story"><div><span>70</span><p>business applications, one shared data model.</p></div><blockquote>Give every person the right tool for the job—without creating another data silo.</blockquote><p>Each app simplifies one process. Together they connect the entire customer, financial, operational, and employee lifecycle.</p></div>
+      </section>
+
+      <section class="marketing-section quality-section">
+        <div class="section-heading"><span class="section-kicker">Level up your quality of work</span><h2>Designed for momentum.</h2><p>Less data entry. Fewer handoffs. Clearer decisions. Hich Solutions brings the next action to the surface and keeps the context attached.</p></div>
+        <div class="quality-grid"><article class="quality-visual speed-visual"><div class="speed-ring"><b>&lt; 100ms</b><span>interface response</span></div><div class="speed-lines"><i></i><i></i><i></i><i></i></div></article><article class="quality-copy"><span class="feature-number">01</span><h3>Optimized for productivity</h3><p>Smart defaults, keyboard-first navigation, reusable records, bulk actions, and connected approvals keep everyday operations moving.</p><ul><li>One search across every application</li><li>Activities and messages on every record</li><li>Import, export, filter, group, and analyze</li></ul><a href="#apps">Explore the workspace <span>→</span></a></article></div>
+        <div class="quality-grid reverse"><article class="quality-copy"><span class="feature-number">02</span><h3>Native AI across your business</h3><p>Use AI where the work happens: summarize conversations, draft content, find anomalies, classify documents, suggest next steps, and automate repeatable decisions.</p><ul><li>Context-aware assistance</li><li>Agent-ready business operations</li><li>Human approval where it matters</li></ul><button data-show-auth="signup">Build with Hich AI <span>→</span></button></article><article class="quality-visual ai-visual"><div class="ai-command"><span data-icon="trend"></span><p>Analyze overdue invoices and prepare a collection plan.</p><b>⌘ ↵</b></div><div class="ai-result"><div><i></i><span></span></div><div><i></i><span></span></div><div><i></i><span></span></div></div></article></div>
+      </section>
+
+      <section class="marketing-section platform-section" id="platform">
+        <div class="section-heading light centered"><span class="section-kicker">Enterprise software, done with clarity</span><h2>Flexible at the core.<br>Predictable at the edge.</h2><p>A modular platform, PostgreSQL data foundation, open APIs, tenant isolation, and configurable workflows give teams room to evolve.</p></div>
+        <div class="platform-grid"><article><span data-icon="grid"></span><h3>Modular by design</h3><p>Activate only what you need while preserving one shared customer and operational model.</p></article><article><span data-icon="trend"></span><h3>AI-ready workflows</h3><p>Bring automation and assistance into finance, sales, operations, service, and content.</p></article><article><span data-icon="book"></span><h3>Your data, clearly modeled</h3><p>PostgreSQL, exportable records, clear ownership, and no proprietary mystery formats.</p></article><article><span data-icon="settings"></span><h3>Built to adapt</h3><p>Custom fields, views, approval gates, automation rules, and specialized industry apps.</p></article><article><span data-icon="users"></span><h3>Tenant-safe collaboration</h3><p>Every company receives an isolated workspace protected by database-level policies.</p></article><article><span data-icon="wallet"></span><h3>Fair, simple pricing</h3><p>All applications included in one predictable per-user plan with no module maze.</p></article></div>
+      </section>
+
+      <section class="marketing-section industries-section" id="industries"><div class="section-heading centered"><span class="section-kicker">Purpose-built industry systems</span><h2>Your operating model, already understood.</h2><p>Twenty specialized suites extend the same platform for healthcare, education, hospitality, construction, property, mobility, manufacturing, distribution, agriculture, wellness, and IT.</p></div><div class="industry-marquee"><span>Hospital</span><span>Pharmacy</span><span>School</span><span>Hotel</span><span>Restaurant</span><span>Construction</span><span>Real Estate</span><span>Automotive</span><span>Textile</span><span>Logistics</span><span>Warehouse</span><span>Retail</span><span>Agriculture</span><span>Salon & Spa</span><span>IT Assets</span></div><div class="industry-demo"><aside><b>Industry workspace</b><button class="active">Operations</button><button>Customers</button><button>Resources</button><button>Compliance</button><button>Analytics</button></aside><div><div class="demo-head"><span><b>Operations overview</b><small>Live across all locations</small></span><button>New record</button></div><div class="demo-kpis"><i></i><i></i><i></i><i></i></div><div class="demo-table"><i></i><i></i><i></i><i></i><i></i></div></div></div></section>
+
+      <section class="marketing-section pricing-section" id="pricing"><div class="pricing-copy"><span class="section-kicker">A simple value proposition</span><h2>All applications.<br>One honest price.</h2><p>No per-module puzzle. Start small, add workflows, and keep the same connected foundation as your company grows.</p><ul><li>All 70 applications included</li><li>Automatic updates and cloud access</li><li>Organization-level data isolation</li><li>Import and export your business data</li></ul></div><div class="pricing-card"><span>Complete suite</span><div class="price"><sup>US$</sup><b>7.25</b></div><p>per user / month</p><hr><ul><li>70 business and industry apps</li><li>AI-assisted workflows</li><li>Role-based access</li><li>Unlimited module activation</li></ul><button data-show-auth="signup">Start free <span>→</span></button><small>No credit card required</small></div></section>
+
+      <section class="marketing-section proof-section"><div class="proof-number"><b>One</b><span>platform for the whole company</span></div><div class="proof-quote"><span>Product principle</span><blockquote>“Business software should remove friction between teams—not become another department to manage.”</blockquote><p>Hich Solutions is built around connected records, clear workflows, and tools people can understand on the first day.</p></div></section>
+
+      <section class="final-cta"><div><span>Ready to bring the work together?</span><h2>Unleash your growth potential.</h2><p>Build your private workspace in seconds. No OTP and no credit card.</p></div><button data-show-auth="signup">Start now — it’s free <span>→</span></button></section>
+    </main>
+
+    <footer class="marketing-footer" id="help"><div class="footer-brand"><a class="marketing-brand" href="#top"><span class="brand-mark"><i></i><i></i><i></i></span><b>Hich Solutions</b></a><p>A unified suite of business applications covering CRM, commerce, accounting, inventory, manufacturing, HR, marketing, projects, services, and specialized industries.</p></div><div><h3>Platform</h3><a href="#apps">Applications</a><a href="#industries">Industries</a><a href="#pricing">Pricing</a><button data-show-auth="signin">Sign in</button></div><div><h3>Resources</h3><a href="#platform">Product tour</a><a href="#help">Documentation</a><a href="#help">Help center</a><a href="#help">Security</a></div><div><h3>Company</h3><a href="#help">About</a><a href="#help">Contact</a><a href="#help">Partners</a><a href="#help">Legal & privacy</a></div><div class="footer-bottom"><span>© 2026 Hich Solutions</span><span>Built for connected work.</span></div></footer>
+  </div>
+
+  <section class="auth-shell hidden" id="authShell">
     <div class="auth-story">
       <button class="brand auth-brand" aria-label="Hich Solutions home">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -45,14 +107,14 @@
             <button class="btn primary auth-submit" type="submit">Sign in</button>
           </form>
           <form id="signupForm" class="auth-form hidden">
-            <div class="field-grid"><div class="field"><label>Your name</label><input name="full_name" autocomplete="name" placeholder="Alex Morgan" required></div><div class="field"><label>Company</label><input name="company_name" autocomplete="organization" placeholder="Acme Studio" required></div></div>
+            <div class="field"><label>Your name</label><input name="full_name" autocomplete="name" placeholder="Alex Morgan" required></div>
             <div class="field"><label>Work email</label><input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></div>
             <div class="field"><label>Password</label><input type="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required minlength="8"></div>
             <label class="check-label"><input type="checkbox" required> I agree to the Terms and Privacy Policy</label>
-            <button class="btn primary auth-submit" type="submit">Create my workspace</button>
+            <button class="btn primary auth-submit" type="submit">Create account & continue</button>
           </form>
           <div class="auth-error hidden" id="authError"></div>
-          <button type="button" class="btn resend-button hidden" id="resendConfirmation">Resend confirmation email</button>
+          <button type="button" class="btn resend-button hidden" id="resendConfirmation">Retry account activation</button>
           <p class="auth-security">Protected by encrypted sessions and tenant-level data isolation.</p>
         </div>
       </div>
@@ -78,19 +140,26 @@
       <nav class="main-nav" aria-label="Primary navigation">
         <p class="nav-label">Workspace</p>
         <button class="nav-item active" data-route="home" data-icon="grid"><span>Home</span><kbd>G</kbd></button>
-        <button class="nav-item" data-route="overview" data-icon="home"><span>Dashboards</span></button>
-        <button class="nav-item" data-route="sales" data-icon="target"><span>Sales & CRM</span><b class="nav-badge">12</b></button>
-        <button class="nav-item" data-route="finance" data-icon="wallet"><span>Finance</span></button>
-        <button class="nav-item" data-route="inventory" data-icon="boxes"><span>Inventory</span><b class="nav-dot warn"></b></button>
-        <button class="nav-item" data-route="manufacturing" data-icon="factory"><span>Manufacturing</span></button>
-        <button class="nav-item" data-route="people" data-icon="users"><span>People</span></button>
-        <button class="nav-item" data-route="services" data-icon="briefcase"><span>Projects & Services</span></button>
-        <button class="nav-item" data-route="marketing" data-icon="megaphone"><span>Marketing</span></button>
-        <button class="nav-item" data-route="commerce" data-icon="store"><span>Website & Commerce</span></button>
-        <button class="nav-item" data-route="productivity" data-icon="message"><span>Productivity</span><b class="nav-badge neutral">5</b></button>
+        <button class="nav-item" data-route="overview" data-module="overview" data-icon="home"><span>ERP Overview</span></button>
+        <button class="nav-item pos-nav-item" data-route="pos" data-module="pos" data-icon="store"><span>Point of Sale</span><b class="nav-badge pos-live">Live</b></button>
+        <button class="nav-item" data-route="sales_history" data-module="sales_history" data-icon="receipt"><span>Sales History</span></button>
+        <button class="nav-item" data-route="pharmacy" data-module="pharmacy" data-icon="receipt"><span>Pharmacy Operations</span></button>
+        <button class="nav-item" data-route="salon" data-module="salon" data-icon="calendar"><span>Salon Operations</span></button>
+        <button class="nav-item" data-route="reminders" data-module="reminders" data-icon="message"><span>WhatsApp Reminders</span></button>
+        <button class="nav-item" data-route="automotive" data-module="automotive" data-icon="settings"><span>Workshop Operations</span></button>
+        <button class="nav-item" data-route="customers" data-module="customers" data-icon="users"><span>Customer Details</span></button>
+        <button class="nav-item" data-route="sales" data-module="sales" data-icon="target"><span>Sales & CRM</span></button>
+        <button class="nav-item" data-route="finance" data-module="finance" data-icon="wallet"><span>Finance</span></button>
+        <button class="nav-item" data-route="inventory" data-module="inventory" data-icon="boxes"><span>Inventory</span><b class="nav-dot warn"></b></button>
+        <button class="nav-item" data-route="manufacturing" data-module="manufacturing" data-icon="factory"><span>Manufacturing</span></button>
+        <button class="nav-item" data-route="people" data-module="people" data-icon="users"><span>People & Payroll</span></button>
+        <button class="nav-item" data-route="services" data-module="services" data-icon="briefcase"><span>Projects & Services</span></button>
+        <button class="nav-item" data-route="marketing" data-module="marketing" data-icon="megaphone"><span>Marketing</span></button>
+        <button class="nav-item" data-route="commerce" data-module="commerce" data-icon="store"><span>Website & Commerce</span></button>
+        <button class="nav-item" data-route="productivity" data-module="productivity" data-icon="message"><span>Productivity</span></button>
 
         <p class="nav-label space-top">Manage</p>
-        <button class="nav-item" data-route="apps" data-icon="grid"><span>Apps & Studio</span></button>
+        <button class="nav-item" data-route="apps" data-module="apps" data-icon="grid"><span>Modules</span></button>
         <button class="nav-item" data-route="settings" data-icon="settings"><span>Settings</span></button>
       </nav>
 
@@ -132,6 +201,6 @@
     </section>
   </template>
 
-  <script type="module" src="assets/app.bundle.js"></script>
+  <script type="module" src="/assets/app.bundle.js"></script>
 </body>
 </html>

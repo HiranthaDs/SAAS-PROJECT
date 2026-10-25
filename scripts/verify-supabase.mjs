@@ -44,6 +44,7 @@ await tenantClient.auth.signOut();
 await admin.from('contacts').delete().like('name', `%${marker}`);
 const deleted = await admin.auth.admin.deleteUser(testUser.data.user.id);
 if (deleted.error) throw deleted.error;
+
 console.log(JSON.stringify({
   authenticated: true,
   signupProvisioning: testMembership.data.role === 'owner',
