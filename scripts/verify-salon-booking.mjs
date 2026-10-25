@@ -54,7 +54,7 @@ try {
   if (!organization.booking_slug) throw new Error('Salon booking slug was not generated');
 
   requireResult(await admin.from('organization_settings').update({
-    enabled_modules: ['overview', 'salon', 'reminders', 'pos', 'sales_history', 'customers', 'inventory', 'finance', 'people'],
+    enabled_modules: ['overview', 'salon', 'service_catalog', 'reminders', 'pos', 'sales_history', 'customers', 'inventory', 'finance', 'people'],
     preferences: { onboarding_completed: true, opening_time: '09:00', closing_time: '19:00', booking_interval: 30 },
   }).eq('org_id', orgId), 'Configure salon workspace');
 
@@ -69,6 +69,7 @@ try {
     org_id: orgId,
     name: `Cut & Finish ${marker}`,
     category: 'Hair',
+    description: 'Consultation, treatment, and finish',
     duration_minutes: 60,
     price: 2500,
   }).select('id,name,price').single(), 'Create bookable service');
@@ -77,7 +78,9 @@ try {
     await publicClient.rpc('get_public_salon_booking', { p_slug: organization.booking_slug }),
     'Load public booking page',
   );
-  if (bookingPage.services?.[0]?.id !== service.id) throw new Error('Public service catalogue is not connected');
+  if (bookingPage.services?.[0]?.id !== service.id || bookingPage.services[0].description !== 'Consultation, treatment, and finish') {
+    throw new Error('Public service catalogue is not connected');
+  }
 
   const start = new Date(Date.now() + 48 * 60 * 60 * 1000);
   start.setUTCHours(4, 30, 0, 0);
@@ -137,6 +140,7 @@ try {
   await signedInClient.auth.signOut();
   console.log(JSON.stringify({
     publicBooking: true,
+    serviceCatalogue: true,
     customerProfile: true,
     calendarAppointment: true,
     whatsappReminder: true,
