@@ -12,16 +12,23 @@
     "verify:order-to-cash": "node scripts/verify-order-to-cash.mjs",
     "verify:retail-erp": "node scripts/verify-retail-erp.mjs",
     "verify:industries": "node scripts/verify-industry-profiles.mjs",
+    "verify:industry-expansion": "node scripts/verify-industry-expansion.mjs",
+    "verify:industry-db": "node scripts/verify-ten-industry-modules.mjs",
     "verify:salon": "node scripts/verify-salon-booking.mjs",
     "verify:salon-locations": "node scripts/verify-salon-locations.mjs",
     "verify:admin-hierarchy": "node scripts/verify-admin-hierarchy.mjs",
     "verify:login-paths": "node scripts/verify-login-paths.mjs",
+    "verify:notifications": "node scripts/verify-system-notifications.mjs",
     "verify:browser-login": "node scripts/verify-browser-login-flow.mjs",
-    "verify:signup-api": "node scripts/verify-signup-api.mjs"
+    "verify:signup-api": "node scripts/verify-signup-api.mjs",
+    "verify:people-retail": "node scripts/verify-people-retail-operations.mjs",
+    "verify:hotel-medical": "node scripts/verify-hotel-medical.mjs",
+    "verify:hotel-medical-browser": "node scripts/verify-hotel-medical-browser.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.118.0"
+    "@supabase/supabase-js": "^2.118.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "dotenv": "^18.0.9",

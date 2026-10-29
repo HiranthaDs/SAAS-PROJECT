@@ -8,7 +8,11 @@ config({ path: '.env.local' });
 const { DATABASE_URL, SUPABASE_URL, SUPABASE_SECRET_KEY, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD } = process.env;
 if (!DATABASE_URL || !SUPABASE_URL || !SUPABASE_SECRET_KEY) throw new Error('Missing Supabase setup environment variables');
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+const databaseUrl = new URL(DATABASE_URL);
+// Supabase transaction pooling is the reliable DDL path from portable Sites workers.
+// Keep direct database URLs unchanged; only normalize Supabase's session-pooler port.
+if (databaseUrl.hostname.endsWith('.pooler.supabase.com') && databaseUrl.port === '5432') databaseUrl.port = '6543';
+const pool = new pg.Pool({ connectionString: databaseUrl.toString(), ssl: { rejectUnauthorized: false }, keepAlive: true });
 const migrationsUrl = new URL('../supabase/migrations/', import.meta.url);
 const migrations = (await readdir(migrationsUrl)).filter((name) => name.endsWith('.sql')).sort();
 for (const migration of migrations) {

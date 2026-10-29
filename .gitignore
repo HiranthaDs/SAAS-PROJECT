@@ -4,4 +4,6 @@ node_modules/
 !.env.example
 *.log
 tmp-*/
+.chrome-qa/
+.tmp-*.png
 

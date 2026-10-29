@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,6 +20,7 @@ const ownerPassword = `Owner-${crypto.randomUUID()}!`;
 const temporaryPassword = `Employee-${crypto.randomUUID()}!`;
 const privatePassword = `Private-${crypto.randomUUID()}!`;
 const browserDirectory = mkdtempSync(join(tmpdir(), 'hich-login-browser-'));
+mkdirSync('.chrome-qa', { recursive: true });
 const debuggingPort = 9237;
 let ownerId = '';
 let employeeId = '';
@@ -109,6 +110,8 @@ try {
     '--disable-gpu',
     '--no-first-run',
     '--no-default-browser-check',
+    '--window-size=1536,1050',
+    '--force-device-scale-factor=1',
     `--remote-debugging-port=${debuggingPort}`,
     `--user-data-dir=${browserDirectory}`,
     'about:blank',
@@ -131,6 +134,23 @@ try {
   await send('Log.enable');
   await send('Page.enable');
 
+  await send('Page.navigate', { url: appUrl });
+  await waitFor(`document.querySelector('.marketing-site.motion-ready') && document.querySelector('.living-window') && document.querySelector('.motion-story') && document.querySelector('[data-experience-tab="automotive"]')`, 'Animated public home');
+  await evaluate(`document.querySelector('[data-experience-tab="automotive"]')?.click()`);
+  await waitFor(`/registration plate/i.test(document.querySelector('[data-experience-panel] h3')?.textContent||'')`, 'Interactive automotive experience');
+  for (const width of [320, 360, 390, 430, 768]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    await pause(260);
+    const publicMobile = await evaluate(`({innerWidth,scrollWidth:document.documentElement.scrollWidth,headline:document.querySelector('.hero-copy h1')?.getBoundingClientRect(),ctaDisplay:getComputedStyle(document.querySelector('.marketing-actions .marketing-cta')).display})`);
+    if (publicMobile.scrollWidth > publicMobile.innerWidth + 1 || publicMobile.headline.left < 0 || publicMobile.headline.right > publicMobile.innerWidth + 1 || (width <= 430 && publicMobile.ctaDisplay !== 'none')) throw new Error(`Public mobile overflow at ${width}px: ${JSON.stringify(publicMobile)}`);
+    if (width === 390) {
+      const publicMobileScreenshot = await send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+      writeFileSync('.chrome-qa/neon-home-mobile.png', Buffer.from(publicMobileScreenshot.data, 'base64'));
+    }
+  }
+  await send('Emulation.clearDeviceMetricsOverride');
+  await pause(150);
+  await send('Page.navigate', { url: `${appUrl}/staff/${branch.employee_login_slug}` });
   await waitFor(`document.querySelector('#employeeLoginForm')`, 'Branch login form');
   await fillAndSubmit('#employeeLoginForm', { email: employeeEmail, password: temporaryPassword });
   await waitFor(`document.querySelector('#requiredPasswordForm') || (!document.querySelector('#appShell')?.classList.contains('hidden') && document.querySelector('#pageContent'))`, 'Branch workspace or required-password form');
@@ -153,6 +173,41 @@ try {
   const adminIdentity = await evaluate(`({workspace:document.querySelector('.workspace-switcher strong')?.textContent,user:document.querySelector('.user-copy strong')?.textContent,role:document.querySelector('.user-copy small')?.textContent,authError:document.querySelector('#authError')?.textContent})`);
   if (adminIdentity.workspace !== `Browser Salon ${marker}`) throw new Error(`Incorrect administrator UI identity: ${JSON.stringify(adminIdentity)}`);
 
+  const homeTheme = await evaluate(`(()=>{const style=(selector)=>getComputedStyle(document.querySelector(selector));return {font:style('body').fontFamily,sidebar:style('.sidebar').backgroundColor,panel:style('.sb-panel').backgroundColor,brand:getComputedStyle(document.documentElement).getPropertyValue('--brand').trim(),primary:style('.home-supabase .btn.sb-primary').backgroundColor}})()`);
+  if (!/Inter/i.test(homeTheme.font) || homeTheme.sidebar !== 'rgb(249, 250, 249)' || homeTheme.panel !== 'rgb(255, 255, 255)' || homeTheme.brand.toUpperCase() !== '#1D5147' || homeTheme.primary !== 'rgb(29, 81, 71)') throw new Error(`Incorrect soft-enterprise product theme: ${JSON.stringify(homeTheme)}`);
+  const readableType = await evaluate(`({body:parseFloat(getComputedStyle(document.body).fontSize),nav:parseFloat(getComputedStyle(document.querySelector('.nav-item')).fontSize),pageTitle:parseFloat(getComputedStyle(document.querySelector('.sb-home-header h1')).fontSize)})`);
+  if (readableType.body < 16 || readableType.nav < 13 || readableType.pageTitle < 28) throw new Error(`Product type scale is too small: ${JSON.stringify(readableType)}`);
+  const liveHome = await evaluate(`({revenue:Boolean(document.querySelector('.sb-revenue-pulse .sb-live-chart svg')),signals:Boolean(document.querySelector('.sb-operational-signal .sb-signal-ring')),activity:Boolean(document.querySelector('.sb-activity-feed')),branches:Boolean(document.querySelector('.sb-branch-health')),clock:Boolean(document.querySelector('[data-live-clock]'))})`);
+  if (Object.values(liveHome).some((ready) => !ready)) throw new Error(`Missing real-data home visuals: ${JSON.stringify(liveHome)}`);
+  const homeScreenshot = await send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+  writeFileSync('.chrome-qa/soft-theme-dashboard.png', Buffer.from(homeScreenshot.data, 'base64'));
+  await evaluate(`document.querySelector('.nav-item[data-route="people"]')?.click()`);
+  await waitFor(`document.querySelector('.people-directory-table') && document.querySelector('[data-people-tab="employees"].active')`, 'Employee database view');
+  for (const tab of ['departments', 'positions', 'performance', 'employees']) {
+    await evaluate(`document.querySelector('[data-people-tab=${JSON.stringify(tab)}]')?.click()`);
+    await waitFor(`document.querySelector('[data-people-tab=${JSON.stringify(tab)}].active') && document.querySelector('.people-directory-table')`, `Employee ${tab} tab`);
+  }
+  const peopleScreenshot = await send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+  writeFileSync('.chrome-qa/soft-theme-people.png', Buffer.from(peopleScreenshot.data, 'base64'));
+  await evaluate(`document.querySelector('.nav-item[data-route="salon"]')?.click()`);
+  await waitFor(`document.querySelector('.sb-schedule') && document.querySelector('.salon-kanban-shell') && document.querySelector('.salon-calendar-card')`, 'Salon white booking workspace');
+  const bookingTheme = await evaluate(`(()=>{const background=(selector)=>getComputedStyle(document.querySelector(selector)).backgroundColor;const banner=getComputedStyle(document.querySelector('.salon-booking-link'));return {schedule:background('.sb-schedule'),kanban:background('.salon-kanban-shell'),calendar:background('.salon-calendar-card'),banner:banner.backgroundImage,bannerText:banner.color}})()`);
+  if ([bookingTheme.schedule,bookingTheme.kanban,bookingTheme.calendar].some((colour) => colour !== 'rgb(255, 255, 255)') || !/237, 247, 240/.test(bookingTheme.banner) || bookingTheme.bannerText !== 'rgb(49, 92, 67)') throw new Error(`Incorrect booking theme: ${JSON.stringify(bookingTheme)}`);
+  const salonScreenshot = await send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+  writeFileSync('.chrome-qa/lime-booking-desktop.png', Buffer.from(salonScreenshot.data, 'base64'));
+  for (const width of [320, 360, 390, 430, 768]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    await pause(260);
+    const workspaceMobile = await evaluate(`({innerWidth,scrollWidth:document.documentElement.scrollWidth,mainWidth:document.querySelector('.main-area')?.getBoundingClientRect().width,sidebarRight:document.querySelector('.sidebar')?.getBoundingClientRect().right})`);
+    if (workspaceMobile.scrollWidth > workspaceMobile.innerWidth + 1 || workspaceMobile.mainWidth > workspaceMobile.innerWidth + 1 || workspaceMobile.sidebarRight > 2) throw new Error(`Workspace mobile overflow or sidebar state at ${width}px: ${JSON.stringify(workspaceMobile)}`);
+    if (width === 390) {
+      const workspaceMobileScreenshot = await send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+      writeFileSync('.chrome-qa/lime-booking-mobile.png', Buffer.from(workspaceMobileScreenshot.data, 'base64'));
+    }
+  }
+  await send('Emulation.clearDeviceMetricsOverride');
+  await pause(150);
+
   await evaluate(`location.href=${JSON.stringify(`${appUrl}/staff/${branch.employee_login_slug}`)}`);
   await waitFor(`!document.querySelector('#appShell')?.classList.contains('hidden') && /Workspace super admin/.test(document.querySelector('.user-copy small')?.textContent||'')`, 'Administrator through branch location login');
   const adminBranchIdentity = await evaluate(`({workspace:document.querySelector('.workspace-switcher strong')?.textContent,role:document.querySelector('.user-copy small')?.textContent,portalError:document.querySelector('.employee-login-error')?.textContent})`);
@@ -161,11 +216,18 @@ try {
 
   console.log(JSON.stringify({
     browserBranchLogin: true,
+    browserAnimatedPublicHome: true,
+    browserPublicMobile: true,
     browserFirstPasswordChange: true,
     browserBranchWorkspaceLoaded: true,
     browserManagerMainLogin: true,
     browserAdminSwitch: true,
     browserAdminBranchLogin: true,
+    browserSupabaseWhiteTheme: true,
+    browserRealDataHome: true,
+    browserReadableTypeScale: true,
+    browserBookingLimeTheme: true,
+    browserWorkspaceMobile: true,
     uncaughtBrowserErrors: 0,
   }));
 } finally {

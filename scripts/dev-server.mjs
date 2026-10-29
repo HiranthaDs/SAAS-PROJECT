@@ -12,6 +12,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=
 const respond = (res, status, data) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(data)); };
 const allowedPermissions = ['salon_view','salon_create','salon_move','salon_approve','salon_allocate','customers_view','sales_view','settings_view'];
 const cleanPermissions = value => Object.fromEntries(allowedPermissions.map(key => [key, value?.[key] === true]));
+const departmentForBusiness = type => ({ clothing_fashion: 'Fashion', restaurant: 'Restaurant', hotel: 'Hospitality', construction: 'Construction', real_estate: 'Property', education: 'Education', healthcare_clinic: 'Healthcare', logistics: 'Logistics', manufacturing_business: 'Production', agriculture: 'Agriculture', automotive: 'Automotive', retail_grocery: 'Retail', pharmacy: 'Pharmacy', salon: 'Salon' }[type] || 'Operations');
 const readBody = async req => { let raw = ''; for await (const chunk of req) raw += chunk; return JSON.parse(raw || '{}'); };
 
 async function requireSuperAdmin(req, orgId) {
@@ -45,14 +46,14 @@ async function createManagedAccount(req, res) {
   const title = String(body.title || '').trim();
   const role = ['viewer','member','manager','admin'].includes(body.role) ? body.role : 'member';
   if (!/^[0-9a-f-]{36}$/i.test(orgId)) return respond(res, 400, { error: 'Choose a valid workspace.' });
-  if (!/^[0-9a-f-]{36}$/i.test(locationId)) return respond(res, 400, { error: 'Choose a valid salon location.' });
+  if (!/^[0-9a-f-]{36}$/i.test(locationId)) return respond(res, 400, { error: 'Choose a valid business location.' });
   if (!/^\S+@\S+\.\S+$/.test(email)) return respond(res, 400, { error: 'Enter a valid email address.' });
   if (password.length < 10) return respond(res, 400, { error: 'Temporary password must contain at least 10 characters.' });
   if (!fullName) return respond(res, 400, { error: 'Full name is required.' });
-  const orgResult = await admin.from('organizations').select('id,name').eq('id', orgId).maybeSingle();
+  const orgResult = await admin.from('organizations').select('id,name,business_type').eq('id', orgId).maybeSingle();
   if (orgResult.error || !orgResult.data) return respond(res, 404, { error: 'Workspace not found.' });
   const locationResult = await admin.from('salon_locations').select('id,name,employee_login_slug').eq('id', locationId).eq('org_id', orgId).eq('active', true).maybeSingle();
-  if (locationResult.error || !locationResult.data) return respond(res, 404, { error: 'Salon location not found or inactive.' });
+  if (locationResult.error || !locationResult.data) return respond(res, 404, { error: 'Business location not found or inactive.' });
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { full_name: fullName, company_name: `${fullName} setup`, provisioning_kind: 'employee' } });
   if (created.error) return respond(res, created.error.status === 422 ? 409 : (created.error.status || 400), { error: created.error.message });
   const userId = created.data.user.id;
@@ -64,7 +65,7 @@ async function createManagedAccount(req, res) {
     const profile = await admin.from('profiles').update({ full_name: fullName, email, must_change_password: true }).eq('id', userId); if (profile.error) throw profile.error;
     const membership = await admin.from('memberships').upsert({ org_id: orgId, user_id: userId, role, status: 'active' }); if (membership.error) throw membership.error;
     const access = await admin.from('organization_user_access').upsert({ org_id: orgId, user_id: userId, location_id: locationId, title: title || null, permissions: cleanPermissions(body.permissions), created_by: actor.id }); if (access.error) throw access.error;
-    const employee = await admin.from('employees').insert({ org_id: orgId, location_id: locationId, user_id: userId, name: fullName, email, role_title: title || 'Workspace user', department: 'Salon', employment_status: 'active', bookable_for_appointments: true }); if (employee.error) throw employee.error;
+    const employee = await admin.from('employees').insert({ org_id: orgId, location_id: locationId, user_id: userId, name: fullName, email, role_title: title || 'Workspace user', department: departmentForBusiness(orgResult.data.business_type), employment_status: 'active', bookable_for_appointments: orgResult.data.business_type === 'salon' }); if (employee.error) throw employee.error;
     await auditAccountAction(orgId, actor.id, 'account.created', userId, { account_email: email, full_name: fullName, role, title, location_id: locationId, location_name: locationResult.data.name });
     return respond(res, 201, { created: true, user_id: userId, location_id: locationId, employee_login_slug: locationResult.data.employee_login_slug });
   } catch (error) {
@@ -89,9 +90,9 @@ async function updateManagedAccount(req, res, userId) {
     await auditAccountAction(orgId, actor.id, 'account.temporary_password_reset', userId);
     return respond(res, 200, { updated: true });
   }
-  if (!/^[0-9a-f-]{36}$/i.test(locationId)) return respond(res, 400, { error: 'Choose a valid salon location.' });
+  if (!/^[0-9a-f-]{36}$/i.test(locationId)) return respond(res, 400, { error: 'Choose a valid business location.' });
   const locationResult = await admin.from('salon_locations').select('id,name').eq('id', locationId).eq('org_id', orgId).eq('active', true).maybeSingle();
-  if (locationResult.error || !locationResult.data) return respond(res, 404, { error: 'Salon location not found or inactive.' });
+  if (locationResult.error || !locationResult.data) return respond(res, 404, { error: 'Business location not found or inactive.' });
   const role = ['viewer','member','manager','admin'].includes(body.role) ? body.role : 'member';
   const status = ['active','suspended'].includes(body.status) ? body.status : 'active';
   if (actor.id === userId && status === 'suspended') return respond(res, 400, { error: 'You cannot suspend your own super-admin account.' });

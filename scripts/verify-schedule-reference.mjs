@@ -1,0 +1,108 @@
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
+import vm from 'node:vm';
+
+const source=readFileSync('dist/assets/app.js','utf8');
+const html=readFileSync('dist/index.html','utf8');
+const css=readFileSync('dist/assets/styles.css','utf8')+'\n'+readFileSync('dist/assets/schedule-reference.css','utf8')+'\n'+readFileSync('dist/assets/system-theme.css','utf8');
+const schedule=source.slice(source.indexOf('function salonSchedulePro(){'),source.indexOf('\nfunction salonKanban(){'));
+const icons=source.slice(source.indexOf('const icons ='),source.indexOf('\n',source.indexOf('function icon(')));
+const money=source.split('\n').filter(line=>/^const (money|lkr)=/.test(line)).join('\n');
+const status=source.split('\n').find(line=>line.startsWith('function statusClass('));
+const bindings=source.split('\n').filter(line=>/\$.*\[data-schedule-(date|move|today|staff|zoom)\]/.test(line)).join('\n');
+const fixture=`
+const RealDate=globalThis.Date;
+const Date=class extends RealDate{constructor(...args){super(...(args.length?args:['2026-10-26T11:20:00']))}};
+const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+let salonScheduleDate=new Date(),salonScheduleZoom=30,salonScheduleStaff='all',activeSalonLocationId='branch';
+const orgSettings={preferences:{opening_time:'06:00',closing_time:'18:00'}};
+const salonLocations=[{id:'branch',name:'Colombo Studio'}];
+const activeSalonLocation=()=>salonLocations[0];
+const staff=[{id:'a',name:'Amaya Perera',role:'Hair specialist',location_id:'branch'},{id:'b',name:'Nethmi Silva',role:'Beauty therapist',location_id:'branch'},{id:'c',name:'Dinuka Fernando',role:'Senior stylist',location_id:'branch'},{id:'d',name:'Sashini Dias',role:'Nail artist',location_id:'branch'}];
+const salonStaff=()=>staff;
+const booking=(id,staffId,start,end,service,customer,status='confirmed')=>({id,staff_id:staffId,staff_name:staff.find(s=>s.id===staffId)?.name,starts_at:'2026-10-26T'+start,ends_at:'2026-10-26T'+end,service_name:service,customer_name:customer,status,price:4500,location_id:'branch'});
+let appointments=[booking('one','a','07:00','08:00','Haircut & styling','Roshini Jayasuriya'),booking('two','a','08:00','09:30','Colour & treatment','Kavindi De Silva'),booking('three','b','09:00','10:30','Signature facial','Nimali Perera'),booking('four','c','07:30','09:00','Hair treatment','Dulani Fernando'),booking('five','c','10:00','11:30','Cut & blow dry','Tharushi Silva','booked'),booking('six','d','09:30','11:00','Gel manicure','Anjali Dias'),booking('seven','a','11:30','13:00','Hair spa','Piumi Wickrama','booked')];
+let offTimes=[{staff_id:'b',location_id:'branch',starts_at:'2026-10-26T12:00',ends_at:'2026-10-26T13:00',reason:'Lunch break'}];
+const visibleSalonAppointments=()=>appointments;
+const visibleSalonAvailability=()=>offTimes;
+`;
+const code=[fixture,icons,money,status,schedule].join('\n');
+const context=vm.createContext({});
+vm.runInContext(code,context);
+const run=expression=>vm.runInContext(expression,context);
+assert.match(run('money(1234.5)'),/^LKR 1,234\.50$/);
+assert.match(run('lkr(0)'),/^LKR 0$/);
+assert.equal((run('salonSchedulePro()').match(/data-staff-lane=/g)||[]).length,4);
+run("salonScheduleStaff='b'");
+let result=run('salonSchedulePro()');
+assert.equal((result.match(/data-staff-lane=/g)||[]).length,1);
+assert.match(result,/data-staff-lane="b"/);
+run("salonScheduleStaff='missing'");
+run('salonSchedulePro()');
+assert.equal(run('salonScheduleStaff'),'all');
+run("appointments.push(booking('overlap','a','07:30','08:30','Overlap check','Test client'))");
+result=run('salonSchedulePro()');
+assert.match(result,/width:calc\(50% - 6px\)/);
+assert.match(result,/left:calc\(50% \+ 3px\)/);
+run("appointments=[];offTimes=[{staff_id:'a',starts_at:'2026-10-25T21:00',ends_at:'2026-10-27T00:00',reason:'All day leave'}]");
+result=run('salonSchedulePro()');
+assert.match(result,/class="sb-staff-off" style="top:0%;height:100%"/);
+run("appointments=[{...booking('midnight','a','23:30','00:30','Late service','Test'),ends_at:'2026-10-27T00:30'}];offTimes=[]");
+result=run('salonSchedulePro()');
+assert.ok(!result.includes('height:-'));
+assert.match(result,/23:30–24:00/);
+assert.ok(!/currency:'USD'|\$\d/.test(source));
+console.log('Passed: LKR formatting, staff filtering, stale filter reset, overlapping appointments, all-day closures, midnight clipping.');
+if(!process.argv.includes('--browser'))process.exit(0);
+
+mkdirSync('.chrome-qa',{recursive:true});
+let sidebar=html.match(/<aside class="sidebar"[\s\S]*?<\/aside>/)[0];
+const keep=new Set(['home','salon','service_catalog','reminders','customers','sales','finance','inventory','people','apps','settings']);
+sidebar=sidebar.replace(/<button class="nav-item[^]*?<\/button>/g,button=>keep.has(button.match(/data-route="([^"]+)"/)?.[1])?button:'');
+sidebar=sidebar.replace('nav-item active','nav-item').replace('class="nav-item" data-route="salon"','class="nav-item active" data-route="salon"');
+const page=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div class="app-shell">${sidebar}<main class="main-area"><header class="topbar"><span style="font-size:13px;color:#81898c">Colombo Studio &nbsp; › &nbsp; Schedule</span></header><div class="page" id="page"></div></main></div><script>${code}
+const $=(selector,root=document)=>root.querySelector(selector),$$=(selector,root=document)=>[...root.querySelectorAll(selector)];
+const page=$('#page');function render(){page.innerHTML=salonSchedulePro();${bindings}}
+$$('[data-icon]').forEach(el=>el.insertAdjacentHTML('afterbegin',icon(el.dataset.icon)));
+render();</script></body></html>`;
+const server=createServer((req,res)=>{res.writeHead(200,{'content-type':'text/html; charset=utf-8'});res.end(page)});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const browser=spawn('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=9248',`--user-data-dir=${resolve('.chrome-qa/schedule-reference-profile')}`,'about:blank'],{windowsHide:true,stdio:'ignore'});
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+let socket;
+try{
+ let tabs;
+ for(let attempt=0;attempt<70;attempt++){try{tabs=await(await fetch('http://127.0.0.1:9248/json')).json();break}catch{await delay(100)}}
+ assert.ok(tabs,'Chrome debugging endpoint unavailable');
+ socket=new WebSocket(tabs.find(tab=>tab.type==='page').webSocketDebuggerUrl);
+ await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
+ let id=0;const pending=new Map();
+ socket.onmessage=event=>{const reply=JSON.parse(event.data);if(reply.id){pending.get(reply.id)?.(reply);pending.delete(reply.id)}};
+ const send=(method,params={})=>new Promise((resolve,reject)=>{const key=++id;pending.set(key,reply=>reply.error?reject(new Error(JSON.stringify(reply.error))):resolve(reply.result));socket.send(JSON.stringify({id:key,method,params}))});
+ const evaluate=async expression=>{const result=await send('Runtime.evaluate',{expression,returnByValue:true});if(result.exceptionDetails)throw new Error(result.exceptionDetails.text);return result.result.value};
+ await send('Page.enable');
+ await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1080,deviceScaleFactor:1,mobile:false});
+ await send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}`});
+ for(let i=0;i<60;i++){if(await evaluate('Boolean(document.querySelector(".sb-staff-event"))'))break;await delay(100)}
+ assert.equal(await evaluate('document.querySelectorAll(".sb-staff-event").length'),7);
+ assert.equal(await evaluate('getComputedStyle(document.querySelector(".nav-item.active")).backgroundColor'),'rgb(235, 241, 237)');
+ assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+ writeFileSync('.chrome-qa/schedule-reference-desktop.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await evaluate('document.querySelector("[data-schedule-staff=b]").click()');
+ assert.equal(await evaluate('document.querySelectorAll("[data-staff-lane]").length'),1);
+ await evaluate('document.querySelector("[data-schedule-move=\\"1\\"]").click()');
+ assert.equal(await evaluate('document.querySelectorAll(".sb-staff-event").length'),0);
+ await evaluate('document.querySelector("[data-schedule-today]").click();document.querySelector("[data-schedule-staff=all]").click();document.querySelector("[data-schedule-zoom=\\"15\\"]").click()');
+ assert.equal(await evaluate('document.querySelector(".sb-calendar-corner small").textContent'),'15 min grid');
+ await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await delay(350);
+ assert.ok(await evaluate('document.querySelector(".sidebar").getBoundingClientRect().right<=1'),'Closed mobile sidebar covers the calendar');
+ assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'),'Mobile document overflows');
+ assert.ok(await evaluate('document.querySelector(".sb-staff-calendar-scroll").scrollWidth>document.querySelector(".sb-staff-calendar-scroll").clientWidth'));
+ writeFileSync('.chrome-qa/schedule-reference-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ console.log('Passed browser checks: desktop layout, green sidebar selection, staff filtering, date navigation, Today, interval controls, mobile containment.');
+ await send('Browser.close');
+}finally{socket?.close();browser.kill();server.close()}
