@@ -1,0 +1,12 @@
+.git
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+node_modules
+target
+tmp-*
+.chrome-qa
+*.log
+*.tar.gz

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: hich-one
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:.env.local[.properties]
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  address: ${HOST:127.0.0.1}
+  port: ${PORT:3000}
+  compression:
+    enabled: true
+    mime-types: application/json,application/javascript,text/html,text/css,text/plain
+  error:
+    include-message: never
+    include-stacktrace: never
+
+app:
+  supabase:
+    url: ${SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL:}}
+    publishable-key: ${SUPABASE_PUBLISHABLE_KEY:${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:}}
+    secret-key: ${SUPABASE_SECRET_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  application:
+    name: HICH ONE
+    runtime: Spring Boot

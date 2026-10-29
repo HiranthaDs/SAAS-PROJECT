@@ -2,7 +2,7 @@
 
 An industry-aware, multi-tenant SaaS operating system for running sales, finance, inventory, people, branches, customer operations, hotels, medical centers, salons, pharmacies, workshops, retail businesses, and other specialized workflows from one secure workspace.
 
-The application uses a browser-based JavaScript interface, Supabase Authentication, PostgreSQL, Row Level Security (RLS), Supabase Storage, Realtime subscriptions, and a portable server build suitable for local development or cloud deployment.
+The application uses a Spring Boot 4/Java 21 server, a browser-based JavaScript interface, Supabase Authentication, PostgreSQL, Row Level Security (RLS), Supabase Storage, and Realtime subscriptions. Spring Boot serves the SPA and owns every operation that requires the Supabase service key.
 
 ## Contents
 
@@ -100,9 +100,11 @@ PostgreSQL + Row Level Security + RPC functions
      |                 +-- Supabase Storage (hotel room images)
      +-- Realtime changes (bookings, queues, availability)
 
-Portable application server
+Spring Boot application server
      +-- Serves the application shell, CSS, and bundled JavaScript
      +-- Provides protected account-administration endpoints
+     +-- Supplies public browser configuration at runtime
+     +-- Exposes health and application information endpoints
      +-- Uses the Supabase service key only on the server
 ```
 
@@ -113,15 +115,19 @@ Portable application server
 - `dist/assets/styles.css`, `system-theme.css`, `schedule-reference.css`, and `hotel-medical.css` provide the responsive design system.
 - `utils/supabase/client.js` creates the browser Supabase client using publishable credentials.
 
-### Server build
+### Spring Boot server
 
-`scripts/build.mjs` bundles the JavaScript with esbuild and creates `dist/server/index.js`. The generated server:
+The Java application under `src/main/java` is built by Maven and packaged as an executable Spring Boot JAR. It:
 
 - Serves the application and compiled assets.
 - Handles account creation.
 - Allows authorized workspace super administrators to provision employee accounts.
 - Validates Supabase access tokens server-side.
+- Serves public portal routes through the same SPA entry point.
+- Publishes `/actuator/health` for deployment health checks.
 - Keeps the Supabase secret key out of browser code.
+
+The frontend remains a client-side application because it relies on Supabase Realtime and browser workflows. `scripts/build-frontend.mjs` is an optional source-maintenance tool; Node.js is not required to run the packaged application.
 
 ### Database
 
@@ -723,7 +729,7 @@ RLS is enabled on organization-owned tables. Policies use helpers including:
 
 ### Service key boundary
 
-`SUPABASE_SECRET_KEY` is used only by server scripts and protected account APIs. It must never be added to frontend JavaScript, committed environment files, screenshots, or documentation containing real values.
+`SUPABASE_SECRET_KEY` is read only by Spring Boot and protected administration tools. It must never be added to frontend JavaScript, committed environment files, screenshots, or documentation containing real values.
 
 ### Audit log
 
@@ -760,67 +766,65 @@ Important actions are written to `activity_log`, including:
 | `/medical/{center_slug}` | Patient queue number and live ticket status | Public |
 | `/staff/{branch_slug}` | Permanent employee branch login | Authentication required |
 
-The development server returns the application shell for these client routes.
+Spring Boot returns the application shell for these client routes.
 
 ## Project structure
 
 ```text
 nexora-suite/
-├── .openai/
-│   └── hosting.json                 # Existing Sites project identity
-├── dist/
-│   ├── index.html                   # Application, auth, and public shells
-│   ├── assets/
-│   │   ├── app.js                   # Main source application
-│   │   ├── app.bundle.js            # Generated browser bundle
-│   │   ├── styles.css               # Main styles
-│   │   ├── system-theme.css         # Product theme
-│   │   ├── schedule-reference.css   # Schedule/calendar styles
-│   │   └── hotel-medical.css        # Hotel/medical portals and dashboards
-│   └── server/
-│       └── index.js                 # Generated portable server
-├── scripts/
-│   ├── build.mjs
-│   ├── dev-server.mjs
-│   ├── setup-supabase.mjs
-│   └── verify-*.mjs                 # Integration and browser verification
-├── supabase/
-│   └── migrations/
-│       └── 001...023_*.sql
-├── utils/
-│   └── supabase/client.js
-├── .env.example
-├── package.json
-└── README.md
+|-- .mvn/wrapper/                    # Self-contained Maven Wrapper configuration
+|-- src/
+|   |-- main/java/com/hichone/nexora/
+|   |   |-- account/                 # Workspace and employee account services
+|   |   |-- api/                     # REST API, runtime config, and SPA routes
+|   |   |-- config/                  # Spring and Supabase configuration
+|   |   `-- supabase/                # Typed Supabase REST client
+|   `-- test/java/                   # Spring context and service tests
+|-- dist/
+|   |-- index.html                   # Application, auth, and public shells
+|   `-- assets/                      # Browser source, bundle, and styles
+|-- scripts/
+|   |-- build-frontend.mjs           # Optional browser bundle rebuild
+|   |-- setup-supabase.mjs           # Existing database administration tool
+|   `-- verify-*.mjs                 # Existing integration/browser verification
+|-- supabase/migrations/             # PostgreSQL migrations 001 through 023
+|-- Dockerfile
+|-- mvnw / mvnw.cmd
+|-- pom.xml
+`-- README.md
 ```
 
 ## Local setup
 
 ### Requirements
 
-- Node.js 20 or later. Node.js 22 is recommended.
-- npm.
+- Java 21 (the machine already has Eclipse Temurin 21).
 - A Supabase project.
-- A PostgreSQL connection string for the same Supabase project.
-- Google Chrome for browser verification scripts.
+- No global Maven installation is required; the included Maven Wrapper downloads Maven automatically.
+- Node.js 20+ and npm are optional and needed only to rebuild the browser bundle, apply migrations with the existing administration tool, or run the existing verification scripts.
+- A PostgreSQL connection string is required only for migration and database verification tools.
+- Google Chrome is required only for browser verification scripts.
 
-### Install dependencies
+### Initialize Java dependencies
 
-```bash
-npm install
+```powershell
+.\mvnw.cmd --version
 ```
+
+On macOS or Linux, use `./mvnw --version`.
 
 ### Environment configuration
 
-Copy `.env.example` to `.env.local` and add real values:
+Copy `.env.example` to `.env.local` and add real values. Spring Boot loads `.env` and `.env.local` automatically:
 
 ```dotenv
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
-
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_PUBLISHABLE_KEY=your_publishable_key
 SUPABASE_SECRET_KEY=your_server_secret_key
+HOST=127.0.0.1
+PORT=3000
+
+# Optional administration-tool values
 DATABASE_URL=postgresql://user:password@host:5432/postgres
 
 SUPER_ADMIN_EMAIL=admin@example.com
@@ -838,15 +842,16 @@ Never commit `.env.local`. The repository ignores `.env` and `.env.*` files exce
 
 ## Database setup and migrations
 
-Apply every SQL migration and provision/update the configured administrator:
+The current Supabase schema is preserved. To apply every SQL migration and provision/update the configured administrator, install the optional Node tooling once and run:
 
 ```bash
+npm install
 npm run setup:supabase
 ```
 
 The setup script:
 
-1. Loads `.env.local`.
+1. Loads `.env.local` (this utility remains Node-based; the application runtime is Java).
 2. Connects to PostgreSQL.
 3. Uses Supabase transaction pooling on port `6543` when the provided connection is a Supabase pooler URL using session port `5432`.
 4. Applies migrations in filename order.
@@ -878,10 +883,16 @@ Do not delete or rewrite an applied production migration. Add a new numbered mig
 
 ## Running the application
 
-Start the development server:
+Start Spring Boot on Windows:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+On macOS or Linux:
 
 ```bash
-npm run dev
+./mvnw spring-boot:run
 ```
 
 Default URL:
@@ -890,38 +901,51 @@ Default URL:
 http://localhost:3000
 ```
 
-The development server serves files from `dist`, provides the protected account APIs, and falls back to `index.html` for public portal routes.
+Spring Boot serves files packaged from `dist`, provides the protected account APIs, supplies the browser-safe Supabase configuration, and forwards public portal routes to `index.html`. Check runtime health at `http://localhost:3000/actuator/health`.
 
 ## Build and deployment
 
-Create the production browser bundle and portable server:
+Build and test the executable production JAR on Windows:
 
-```bash
-npm run build
+```powershell
+.\mvnw.cmd clean package
 ```
 
-Build behavior:
+Run it with:
 
-- Reads public Supabase values from `.env.local`.
-- Bundles `dist/assets/app.js` into `app.bundle.js`.
-- Combines product CSS.
-- Generates `dist/server/index.js`.
-- Keeps server-only Supabase credentials as deployment environment values.
+```powershell
+java -jar target\nexora-suite.jar
+```
+
+The JAR contains the frontend, embedded Tomcat, protected Java APIs, health endpoints, and SPA route handling. For a container build:
+
+```bash
+docker build -t hich-one .
+docker run --rm -p 3000:3000 --env-file .env.local hich-one
+```
 
 For production, configure these server environment values securely:
 
 - `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY`
 
 Do not replace the publishable browser key with the secret key.
 
 ## Verification and testing
 
-### Syntax and bundle checks
+### Java build and tests
+
+```powershell
+.\mvnw.cmd test
+.\mvnw.cmd clean package
+```
+
+### Optional frontend source checks
 
 ```bash
-npm run check
-npm run build
+npm run check:frontend
+npm run build:frontend
 ```
 
 ### Core verification scripts
@@ -1049,6 +1073,7 @@ The migration has not been applied to the Supabase project used by the applicati
 Run:
 
 ```bash
+npm install
 npm run setup:supabase
 ```
 
@@ -1114,7 +1139,7 @@ Never call provider APIs directly from browser JavaScript because credentials wo
 
 ## Security checklist
 
-- Keep `.env.local` out of Git.
+- Keep `.env.local` out of Git; Spring Boot loads it only at runtime.
 - Never place `SUPABASE_SECRET_KEY` in browser code.
 - Use generated public slugs and ticket tokens.
 - Preserve RLS on every organization-owned table.

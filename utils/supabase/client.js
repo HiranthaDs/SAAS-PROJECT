@@ -1,10 +1,11 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const runtimeConfig = globalThis.__NEXORA_CONFIG__ || {};
+const supabaseUrl = runtimeConfig.supabaseUrl;
+const supabaseKey = runtimeConfig.supabasePublishableKey;
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Supabase public environment variables are not configured.');
+  throw new Error('Supabase public configuration is missing. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.');
 }
 
 export const supabase = createSupabaseClient(supabaseUrl, supabaseKey, {
