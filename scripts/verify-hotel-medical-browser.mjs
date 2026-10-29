@@ -100,25 +100,45 @@ try {
   await screenshot('hotel-admin-dashboard');
 
   required(await admin.from('organizations').update({ name: `Medical Center ${marker}`, business_type: 'healthcare_clinic', industry: 'healthcare_clinic' }).eq('id', orgId), 'Switch browser workspace to medical');
-  const center = required(await ownerClient.from('medical_centers').insert({ org_id: orgId, location_id: location.id, name: `Medical Center ${marker}`, public_slug: `browser-medical-${marker}`, phone: '077 555 0202', address: '18 Health Avenue, Colombo', default_slot_minutes: 15, created_by: userId }).select('id,public_slug').single(), 'Create browser medical center');
+  const center = required(await ownerClient.from('medical_centers').insert({ org_id: orgId, location_id: location.id, name: `Medical Center ${marker}`, public_slug: `browser-medical-${marker}`, phone: '077 555 0202', email: `care-${marker}@example.test`, address: '18 Health Avenue, Colombo', registration_number: `REG-${marker}`, tax_number: `TAX-${marker}`, invoice_footer: 'Thank you for choosing our center.', default_slot_minutes: 15, created_by: userId }).select('id,public_slug').single(), 'Create browser medical center');
   const doctors = required(await ownerClient.from('medical_doctors').insert([
-    { org_id: orgId, center_id: center.id, name: 'Dr. Anika Perera', specialty: 'General medicine', room_label: 'Room 1', queue_prefix: 'A' },
-    { org_id: orgId, center_id: center.id, name: 'Dr. Milan Silva', specialty: 'Paediatrics', room_label: 'Room 2', queue_prefix: 'B' },
+    { org_id: orgId, center_id: center.id, name: 'Dr. Anika Perera', specialty: 'General medicine', room_label: 'Room 1', queue_prefix: 'A', consultation_fee: 3500 },
+    { org_id: orgId, center_id: center.id, name: 'Dr. Milan Silva', specialty: 'Paediatrics', room_label: 'Room 2', queue_prefix: 'B', consultation_fee: 4000 },
   ]).select('id'), 'Create browser doctors');
   const dateParts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const date = Object.fromEntries(dateParts.map((part) => [part.type, part.value]));const sessionDate = `${date.year}-${date.month}-${date.day}`;
-  required(await ownerClient.from('medical_sessions').insert(doctors.map((doctor) => ({ org_id: orgId, center_id: center.id, doctor_id: doctor.id, session_date: sessionDate, starts_at: '08:00', ends_at: '12:00', slot_minutes: 15, capacity: 16, status: 'open', created_by: userId }))), 'Create browser sessions');
-  required(await ownerClient.rpc('issue_medical_queue_number', { p_slug: center.public_slug, p_patient_name: 'Browser Patient', p_whatsapp: '0777654321', p_session_id: null, p_source: 'staff' }), 'Issue browser patient');
+  const medicalSessions = required(await ownerClient.from('medical_sessions').insert(doctors.map((doctor) => ({ org_id: orgId, center_id: center.id, doctor_id: doctor.id, session_date: sessionDate, starts_at: '08:00', ends_at: '12:00', slot_minutes: 15, capacity: 16, status: 'open', created_by: userId }))).select('id,doctor_id,doctor_portal_token'), 'Create browser sessions');
+  const firstDoctorSession = medicalSessions.find((item) => item.doctor_id === doctors[0].id);
+  required(await ownerClient.rpc('issue_medical_queue_number', { p_slug: center.public_slug, p_patient_name: 'Browser Patient', p_whatsapp: '0777654321', p_session_id: firstDoctorSession.id, p_source: 'staff' }), 'Issue browser patient');
 
   await send('Page.navigate', { url: `${appUrl}/?qa=${marker}#industry_ops` });await waitFor(`!document.querySelector('#appShell')?.classList.contains('hidden') && /Clinic|Medical/.test(document.querySelector('.workspace-switcher small')?.textContent||'')`, 'Medical admin workspace');
-  await evaluate(`document.querySelector('#industryModuleNav')?.click()`);await waitFor(`document.querySelectorAll('.doctor-console').length===2 && document.querySelector('[data-medical-qr]')`, 'Medical queue dashboard');
+  await evaluate(`document.querySelector('#industryModuleNav')?.click()`);await waitFor(`document.querySelectorAll('.doctor-console').length===2 && document.querySelector('[data-medical-qr]') && document.querySelector('[data-medical-monitor]') && document.querySelectorAll('[data-medical-doctor-link]').length===2 && document.querySelector('.medical-reporting') && document.querySelector('[data-medical-invoice]') && document.querySelector('[data-medical-payment]')`, 'Medical queue dashboard');
+  await evaluate(`document.querySelector('[data-medical-monitor]')?.click()`);await waitFor(`document.querySelector('.monitor-share-modal .doctor-link-qr img')?.src.startsWith('data:image/png')`, 'Medical monitor share QR');await screenshot('medical-monitor-share');await evaluate(`document.querySelector('[data-close-modal]')?.click()`);
+  await evaluate(`document.querySelector('[data-medical-doctor-link]')?.click()`);await waitFor(`document.querySelector('.doctor-link-modal .doctor-link-qr img')?.src.startsWith('data:image/png')`, 'Doctor portal share QR');await screenshot('medical-doctor-share');await evaluate(`document.querySelector('[data-close-modal]')?.click()`);
   await evaluate(`document.querySelector('[data-medical-qr]')?.click()`);await waitFor(`document.querySelector('.qr-sheet img')?.src.startsWith('data:image/png')`, 'Medical queue QR');await screenshot('medical-admin-qr');await evaluate(`document.querySelector('[data-close-modal]')?.click()`);await screenshot('medical-admin-dashboard');
   await send('Page.navigate', { url: `${appUrl}/medical/${center.public_slug}` });await waitFor(`document.querySelectorAll('.medical-public-sessions article').length===2 && document.querySelector('#medicalPublicForm')`, 'Public medical portal');
   const publicMedical = await evaluate(`({sessions:document.querySelectorAll('.medical-public-sessions article').length,center:document.querySelector('.medical-public-hero h1')?.textContent,overflow:document.documentElement.scrollWidth>innerWidth+1})`);
   if (publicMedical.sessions !== 2 || publicMedical.center !== `Medical Center ${marker}` || publicMedical.overflow) throw new Error(`Invalid public medical portal: ${JSON.stringify(publicMedical)}`);
   await screenshot('medical-public-desktop');
+  await fillAndSubmit('#medicalPublicForm', { patient_name: 'Public Queue Patient', whatsapp: '0771112233' });await waitFor(`document.querySelector('.public-queue-ticket.professional .public-ticket-center') && /^[AB]-\\d{3}$/.test(document.querySelector('.public-queue-ticket h1')?.textContent||'')`, 'Professional public patient number');
+  const publicNumber = await evaluate(`({center:document.querySelector('.public-ticket-center h3')?.textContent,invoice:document.querySelector('.public-ticket-reference b')?.textContent,overflow:document.documentElement.scrollWidth>innerWidth+1})`);
+  if (publicNumber.center !== `Medical Center ${marker}` || !/^MED-/.test(publicNumber.invoice || '') || publicNumber.overflow) throw new Error(`Invalid professional patient number: ${JSON.stringify(publicNumber)}`);
+  await screenshot('medical-public-number');
+  await send('Page.navigate', { url: `${appUrl}/medical/${center.public_slug}/monitor` });await waitFor(`document.querySelectorAll('.monitor-doctor').length===2 && document.querySelector('.monitor-join-card img')?.src.startsWith('data:image/png')`, 'Realtime medical monitor');
+  const monitor = await evaluate(`({brand:document.querySelector('.monitor-brand b')?.textContent,doctors:document.querySelectorAll('.monitor-doctor').length,privacy:!/Browser Patient/.test(document.body.innerText),overflow:document.documentElement.scrollWidth>innerWidth+1})`);
+  if (monitor.brand !== 'HICH ONE' || monitor.doctors !== 2 || !monitor.privacy || monitor.overflow) throw new Error(`Invalid clinic monitor: ${JSON.stringify(monitor)}`);
+  await screenshot('medical-monitor-desktop');
+  await send('Page.navigate', { url: `${appUrl}/doctor/${firstDoctorSession.doctor_portal_token}` });await waitFor(`document.querySelector('.doctor-portal-shell') && document.querySelector('[data-doctor-call-next]')`, 'Private doctor portal');
+  await evaluate(`document.querySelector('[data-doctor-call-next]')?.click()`);await waitFor(`document.querySelector('.doctor-current-panel strong')?.textContent.trim()!=='—'`, 'Doctor call-next control');
+  const doctorPortal = await evaluate(`({brand:document.querySelector('.monitor-brand b')?.textContent,current:document.querySelector('.doctor-current-panel strong')?.textContent.trim(),allocated:document.querySelectorAll('.doctor-queue-list article').length,overflow:document.documentElement.scrollWidth>innerWidth+1})`);
+  if (doctorPortal.brand !== 'HICH ONE' || !/^A-\d{3}$/.test(doctorPortal.current) || doctorPortal.overflow) throw new Error(`Invalid doctor portal: ${JSON.stringify(doctorPortal)}`);
+  await screenshot('medical-doctor-portal-desktop');
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });await pause(250);
+  const doctorMobile = await evaluate(`({innerWidth,scrollWidth:document.documentElement.scrollWidth,current:document.querySelector('.doctor-current-panel strong')?.textContent.trim()})`);
+  if (doctorMobile.scrollWidth > doctorMobile.innerWidth + 1) throw new Error(`Doctor portal mobile overflow: ${JSON.stringify(doctorMobile)}`);
+  await screenshot('medical-doctor-portal-mobile');await send('Emulation.clearDeviceMetricsOverride');
   if (browserErrors.length) throw new Error(`Browser errors: ${browserErrors.join(' | ')}`);
-  console.log(JSON.stringify({ publicHotel: true, hotelMobile: true, hotelAdmin: true, roomDateMatrixCells: 28, publicMedical: true, medicalAdmin: true, qrGenerated: true, browserErrors: 0 }));
+  console.log(JSON.stringify({ publicHotel: true, hotelMobile: true, hotelAdmin: true, roomDateMatrixCells: 28, publicMedical: true, professionalPatientNumber: true, medicalAdmin: true, clinicMonitor: true, monitorShareQr: true, monitorPrivacy: true, doctorPortal: true, doctorPortalShareQr: true, doctorPortalMobile: true, professionalBilling: true, dailyMonthlySummary: true, qrGenerated: true, brand: 'HICH ONE', browserErrors: 0 }));
 } finally {
   try { socket?.close(); } catch {}
   try { chrome?.kill(); } catch {}

@@ -129,4 +129,4 @@ createServer(async (req, res) => {
   if (!file.startsWith(normalize(root))) { res.writeHead(403); return res.end(); }
   try { const content = await readFile(file); res.writeHead(200, { 'content-type': types[extname(file)] || 'application/octet-stream' }); res.end(content); }
   catch { const content = await readFile(join(root, 'index.html')); res.writeHead(200, { 'content-type': types['.html'] }); res.end(content); }
-}).listen(port, '127.0.0.1', () => console.log(`Hich Solutions running at http://localhost:${port}`));
+}).listen(port, '127.0.0.1', () => console.log(`HICH ONE running at http://localhost:${port}`));

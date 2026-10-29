@@ -1,4 +1,4 @@
-# Hich Solutions Nexora Suite
+# HICH ONE
 
 An industry-aware, multi-tenant SaaS operating system for running sales, finance, inventory, people, branches, customer operations, hotels, medical centers, salons, pharmacies, workshops, retail businesses, and other specialized workflows from one secure workspace.
 
@@ -31,7 +31,7 @@ The application uses a browser-based JavaScript interface, Supabase Authenticati
 
 ## Product overview
 
-Nexora Suite provides a single workspace in which business data is shared across only the modules that should share it. A user signs in to an organization, receives a role and an optional branch assignment, and then sees the operational modules enabled for that organization's business profile.
+HICH ONE provides a single workspace in which business data is shared across only the modules that should share it. A user signs in to an organization, receives a role and an optional branch assignment, and then sees the operational modules enabled for that organization's business profile.
 
 The platform includes:
 
@@ -125,7 +125,7 @@ Portable application server
 
 ### Database
 
-SQL migrations live in `supabase/migrations`. They are ordered from `001` through `021` and are designed to be safely re-applied by the setup script.
+SQL migrations live in `supabase/migrations`. They are ordered from `001` through `023` and are designed to be safely re-applied by the setup script.
 
 ## Supported business profiles
 
@@ -481,8 +481,9 @@ The medical module supports a center with multiple doctors, shared or doctor-spe
 | `medical_centers` | Branch center profile, public slug, contact details, timezone, and default slot duration |
 | `medical_doctors` | Doctor, specialty, room, employee link, and queue prefix |
 | `medical_staff_assignments` | Assign an employee to the center, one doctor, or a supervisory role |
-| `medical_sessions` | Doctor, date, start/end time, minutes per patient, capacity, and session status |
+| `medical_sessions` | Doctor, date, start/end time, minutes per patient, capacity, session status, and private doctor-portal token |
 | `medical_queue_tickets` | Patient number, doctor session, source, priority, state, timestamps, and public token |
+| `medical_public_queue_snapshots` | Sanitized realtime lobby state: doctor, room, current number, counts, and session state; never patient names or phone numbers |
 
 ### Doctor and staff allocation
 
@@ -565,15 +566,78 @@ If the patient does not select a doctor, `issue_medical_queue_number()`:
 
 This logic distributes patients across two or more doctors without mixing their number sequences.
 
+### Realtime lobby monitor
+
+Public monitor URL:
+
+```text
+/medical/{public_slug}/monitor
+```
+
+The monitor is designed for a reception TV, tablet, or waiting-room screen. It shows every doctor session for the center's local date, the consultation room, current number, queue status, waiting count, completed count, and a large QR code that opens the patient-number page.
+
+From the medical admin dashboard, **Monitor & link** opens a presentation sheet with a monitor QR code, copyable URL, privacy notice, and direct open button. This makes it easy to send the monitor to a smart TV, tablet, reception PC, or another staff member.
+
+The monitor subscribes to `medical_public_queue_snapshots` through Supabase Realtime and refreshes immediately after ticket or session changes. A ten-second fallback refresh keeps the screen accurate after network interruptions. The realtime table is deliberately sanitized and never contains patient names, WhatsApp numbers, notes, or private ticket tokens.
+
+### Private doctor portal
+
+Private session URL:
+
+```text
+/doctor/{doctor_portal_token}
+```
+
+Every doctor session receives a different random UUID capability token. Immediately after a session is created, HICH ONE displays a QR code and copyable link that the administrator can give to the allocated doctor. The portal is responsive for phones, tablets, and desktop computers and shows only that session's allocated numbers.
+
+The doctor can:
+
+1. See the active number and ordered waiting list.
+2. Call the next patient.
+3. Start the consultation.
+4. Complete the active patient or mark a no-show.
+5. See completed and no-show totals.
+6. Receive realtime queue updates, with an eight-second fallback refresh.
+
+The token grants control of one session only. Treat it as private, do not place it on the public monitor, and create a new session if a fresh portal link is required.
+
+### Medical billing and documents
+
+The medical center profile stores the details used on official queue documents and invoices:
+
+- Center name, address, phone, and email.
+- Registration or licence number.
+- Tax number.
+- Currency and invoice footer.
+- Default patient slot duration.
+
+Each doctor may have a consultation fee. When a number is issued, HICH ONE creates a unique medical invoice number, copies the doctor's consultation fee to the ticket, and tracks paid amount, balance, payment status, and payment method. Authorized staff can record a payment and immediately print the final invoice.
+
+The professional patient-number document includes the center details, patient, doctor, specialty, consultation room, session, issue time, live-status QR code, and waiting-room instructions. The A4 invoice includes the center registration/tax details, invoice and patient references, doctor/service line, consultation fee, paid amount, balance, payment method, and center footer.
+
+### Daily and monthly medical summaries
+
+The medical admin dashboard calculates operational and financial summaries from the current month's queue records:
+
+- Patients issued today and this month.
+- Completed consultations.
+- No-shows and attendance rate.
+- Collected and outstanding consultation fees.
+- Seven-day patient-volume chart.
+- Per-doctor issued, completed, no-show, and collected totals.
+
+The doctor portal separately shows its session's waiting, completed, and no-show counts so each doctor can close the day with a clear outcome summary.
+
 ### Atomic call-next logic
 
-`call_next_medical_queue()` prevents two doctors or staff members from calling the same patient:
+`call_next_medical_queue()` and `call_next_medical_queue_by_token()` prevent two doctors or staff members from calling the same patient:
 
 1. The doctor session is locked.
 2. The first waiting ticket is selected by priority and queue number.
 3. `FOR UPDATE SKIP LOCKED` prevents another concurrent caller from selecting that ticket.
-4. The ticket changes to `called` and stores `called_at`.
-5. The action is written to the audit log.
+4. An existing `called` or `in_consultation` ticket is returned instead of calling a second patient.
+5. The ticket changes to `called` and stores `called_at`.
+6. The action is written to the audit log.
 
 ### Patient ticket states
 
@@ -722,7 +786,7 @@ nexora-suite/
 │   └── verify-*.mjs                 # Integration and browser verification
 ├── supabase/
 │   └── migrations/
-│       └── 001...021_*.sql
+│       └── 001...023_*.sql
 ├── utils/
 │   └── supabase/client.js
 ├── .env.example
@@ -807,6 +871,8 @@ The setup script:
 | `019` | Employee/payroll detail and branch inventory receiving |
 | `020` | Ten isolated industry workflows and module-key enforcement |
 | `021` | Hotel inventory/booking/channel engine and medical multi-doctor queue |
+| `022` | Realtime clinic monitor snapshots, private doctor-session portals, and serialized doctor controls |
+| `023` | Medical center document details, consultation fees, payments, invoices, and richer patient status |
 
 Do not delete or rewrite an applied production migration. Add a new numbered migration for future schema changes.
 
@@ -1065,4 +1131,4 @@ GitHub: <https://github.com/HiranthaDs/SAAS-PROJECT>
 
 ---
 
-Hich Solutions Nexora Suite is designed as a connected business operating system: one authenticated workspace, strict tenant and branch boundaries, industry-specific workflows, and database-enforced protection for critical operations.
+HICH ONE is designed as a connected business operating system: one authenticated workspace, strict tenant and branch boundaries, industry-specific workflows, and database-enforced protection for critical operations.

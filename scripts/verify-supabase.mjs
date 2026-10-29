@@ -21,7 +21,7 @@ if (error) throw error;
 await client.auth.signOut();
 
 const admin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-const testEmail = `nexora-test-${Date.now()}@example.test`;
+const testEmail = `hich-one-test-${Date.now()}@example.test`;
 const testPassword = `Verify-${crypto.randomUUID()}!`;
 const testUser = await admin.auth.admin.createUser({ email: testEmail, password: testPassword, email_confirm: true, user_metadata: { full_name: 'Provisioning Test', company_name: 'Provisioning Test Co' } });
 if (testUser.error) throw testUser.error;

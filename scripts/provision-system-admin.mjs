@@ -22,7 +22,7 @@ if (!user) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: fullName, company_name: 'Hich Solutions System Administration', provisioning_kind: 'workspace_owner' },
+    user_metadata: { full_name: fullName, company_name: 'HICH ONE System Administration', provisioning_kind: 'workspace_owner' },
   });
   if (created.error) throw created.error;
   user = created.data.user;
